@@ -241,6 +241,9 @@ tail -n 100 ~/Library/Logs/ldcron/a1b2c3d4.log
 
 ## Troubleshooting
 
+**Upgrading from v0.1.2 or earlier**
+Job IDs changed from 8 to 16 characters in v0.1.3. Existing jobs continue to run, but re-registering the same schedule and command will create a new entry instead of detecting the duplicate. Run `ldcron list` to find old 8-character IDs and `ldcron remove <old-id>` to unload them before re-adding.
+
 **`already registered`**
 The exact same schedule and command are already tracked. Run `ldcron list` to inspect existing jobs; use `ldcron remove` if you want to re-register.
 
