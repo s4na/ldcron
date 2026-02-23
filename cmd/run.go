@@ -13,16 +13,16 @@ var runForce bool
 
 var runCmd = &cobra.Command{
 	Use:   "run <id>",
-	Short: "IDを指定してジョブを即時実行する",
-	Long: `指定したIDのジョブをlaunchdに即時実行させます（非同期）。
+	Short: "Run a job immediately by ID",
+	Long: `Trigger an immediate run of a job via launchd (asynchronous).
 
-実行はバックグラウンドで行われます。結果はログで確認してください:
+The job runs in the background. Check the log for results:
   tail -f ~/Library/Logs/ldcron/<id>.log
 
---force を指定すると、実行中のインスタンスを強制終了してから再起動します。
-強制終了が必要なければ --force は付けないでください。
+With --force, any currently running instance is killed before restarting.
+Omit --force unless you need to forcefully restart the job.
 
-例:
+Examples:
   ldcron run abc12345
   ldcron run --force abc12345`,
 	Args:         cobra.ExactArgs(1),
@@ -31,7 +31,7 @@ var runCmd = &cobra.Command{
 }
 
 func init() {
-	runCmd.Flags().BoolVar(&runForce, "force", false, "実行中のインスタンスを強制終了してから起動する")
+	runCmd.Flags().BoolVar(&runForce, "force", false, "kill any running instance before starting")
 }
 
 func runRun(_ *cobra.Command, args []string) error {
@@ -44,10 +44,10 @@ func runRun(_ *cobra.Command, args []string) error {
 
 	j, err := job.Find(agentsDir, id)
 	if err != nil {
-		return fmt.Errorf("ジョブ検索に失敗: %w", err)
+		return fmt.Errorf("failed to find job: %w", err)
 	}
 	if j == nil {
-		return fmt.Errorf("ジョブが見つかりません: %s", id)
+		return fmt.Errorf("job not found: %s", id)
 	}
 
 	// Ensure the log directory exists before kickstarting so the process can
@@ -56,24 +56,24 @@ func runRun(_ *cobra.Command, args []string) error {
 	if j.Managed {
 		logD, err = logDir()
 		if err != nil {
-			return fmt.Errorf("ログディレクトリの取得に失敗: %w", err)
+			return fmt.Errorf("failed to get log directory: %w", err)
 		}
 	}
 
 	lc, err := launchctl.New()
 	if err != nil {
-		return fmt.Errorf("launchctlクライアントの初期化に失敗: %w", err)
+		return fmt.Errorf("failed to initialize launchctl client: %w", err)
 	}
 	if err = lc.Kickstart(j.Label, runForce); err != nil {
-		return fmt.Errorf("ジョブの実行に失敗: %w", err)
+		return fmt.Errorf("failed to run job: %w", err)
 	}
 
-	fmt.Printf("ジョブをバックグラウンドで起動しました\n")
+	fmt.Printf("Job started in background\n")
 	fmt.Printf("  ID:      %s\n", j.ID)
-	fmt.Printf("  コマンド: %s\n", strings.Join(j.Args, " "))
+	fmt.Printf("  Command: %s\n", strings.Join(j.Args, " "))
 	if j.Managed {
-		fmt.Printf("  ログ:    %s/%s.log\n", logD, j.ID)
-		fmt.Printf("\nログをリアルタイムで確認:\n  tail -f %s/%s.log\n", logD, j.ID)
+		fmt.Printf("  Log:     %s/%s.log\n", logD, j.ID)
+		fmt.Printf("\nFollow log output:\n  tail -f %s/%s.log\n", logD, j.ID)
 	}
 	return nil
 }

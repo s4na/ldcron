@@ -9,7 +9,7 @@ import (
 func launchAgentsDir() (string, error) {
 	home, err := os.UserHomeDir()
 	if err != nil {
-		return "", fmt.Errorf("ホームディレクトリの取得に失敗: %w", err)
+		return "", fmt.Errorf("failed to get home directory: %w", err)
 	}
 	return filepath.Join(home, "Library", "LaunchAgents"), nil
 }
@@ -17,11 +17,11 @@ func launchAgentsDir() (string, error) {
 func logDir() (string, error) {
 	home, err := os.UserHomeDir()
 	if err != nil {
-		return "", fmt.Errorf("ホームディレクトリの取得に失敗: %w", err)
+		return "", fmt.Errorf("failed to get home directory: %w", err)
 	}
 	dir := filepath.Join(home, "Library", "Logs", "ldcron")
 	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return "", fmt.Errorf("ログディレクトリの作成に失敗: %w", err)
+		return "", fmt.Errorf("failed to create log directory: %w", err)
 	}
 	return dir, nil
 }

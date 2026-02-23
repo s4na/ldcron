@@ -70,11 +70,11 @@ func execRun(name string, args ...string) error {
 func currentUID() (int, error) {
 	u, err := user.Current()
 	if err != nil {
-		return 0, fmt.Errorf("ユーザー情報の取得に失敗: %w", err)
+		return 0, fmt.Errorf("failed to get current user: %w", err)
 	}
 	uid, err := strconv.Atoi(u.Uid)
 	if err != nil {
-		return 0, fmt.Errorf("UIDの変換に失敗: %w", err)
+		return 0, fmt.Errorf("failed to parse UID: %w", err)
 	}
 	return uid, nil
 }

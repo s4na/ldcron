@@ -90,7 +90,7 @@ func ValidateSchedule(expr string) []string {
 		for _, d := range days {
 			if d > max {
 				warnings = append(warnings,
-					fmt.Sprintf("警告: %d月に%d日は存在しません — このスケジュールは実行されません", m, d))
+					fmt.Sprintf("warning: day %d does not exist in month %d — this schedule will never fire", d, m))
 			}
 		}
 	}
@@ -105,7 +105,7 @@ func ParseSchedule(expr string) ([]CalendarEntry, error) {
 	}
 	parts := strings.Fields(expr)
 	if len(parts) != 5 {
-		return nil, fmt.Errorf("cron式は5フィールド必要です (分 時 日 月 曜日): %q", expr)
+		return nil, fmt.Errorf("cron expression must have 5 fields (minute hour day month weekday): %q", expr)
 	}
 
 	// expanded[i] == nil means wildcard for that field.
@@ -113,8 +113,8 @@ func ParseSchedule(expr string) ([]CalendarEntry, error) {
 	for i, part := range parts {
 		values, wild, err := expandField(part, fieldSpecs[i])
 		if err != nil {
-			names := []string{"分", "時", "日", "月", "曜日"}
-			return nil, fmt.Errorf("%sフィールドが無効: %w", names[i], err)
+			names := []string{"minute", "hour", "day", "month", "weekday"}
+			return nil, fmt.Errorf("invalid %s field: %w", names[i], err)
 		}
 		if !wild {
 			expanded[i] = values
@@ -164,14 +164,14 @@ func expandToken(s string, spec fieldSpec) ([]int, bool, error) {
 	// Single value
 	v, err := strconv.Atoi(s)
 	if err != nil {
-		return nil, false, fmt.Errorf("無効な値: %q", s)
+		return nil, false, fmt.Errorf("invalid value: %q", s)
 	}
 	// Normalise Sunday: 7 -> 0.
 	if spec.max == 7 && v == 7 {
 		v = 0
 	}
 	if v < spec.min || v > spec.max {
-		return nil, false, fmt.Errorf("値 %d が範囲外 [%d, %d]", v, spec.min, spec.max)
+		return nil, false, fmt.Errorf("value %d out of range [%d, %d]", v, spec.min, spec.max)
 	}
 	return []int{v}, false, nil
 }
@@ -180,7 +180,7 @@ func expandStep(s string, slashIdx int, spec fieldSpec) ([]int, bool, error) {
 	stepStr := s[slashIdx+1:]
 	step, err := strconv.Atoi(stepStr)
 	if err != nil || step <= 0 {
-		return nil, false, fmt.Errorf("無効なステップ: %q", s)
+		return nil, false, fmt.Errorf("invalid step: %q", s)
 	}
 
 	base := s[:slashIdx]
@@ -194,7 +194,7 @@ func expandStep(s string, slashIdx int, spec fieldSpec) ([]int, bool, error) {
 		} else {
 			lo, err = strconv.Atoi(base)
 			if err != nil || lo < spec.min || lo > spec.max {
-				return nil, false, fmt.Errorf("無効な開始値: %q", s)
+				return nil, false, fmt.Errorf("invalid start value: %q", s)
 			}
 			hi = spec.max
 		}
@@ -224,14 +224,14 @@ func parseRange(s string, dashIdx int, spec fieldSpec) (int, int, error) {
 	hiStr := s[dashIdx+1:]
 	lo, err := strconv.Atoi(loStr)
 	if err != nil {
-		return 0, 0, fmt.Errorf("無効な範囲: %q", s)
+		return 0, 0, fmt.Errorf("invalid range: %q", s)
 	}
 	hi, err := strconv.Atoi(hiStr)
 	if err != nil {
-		return 0, 0, fmt.Errorf("無効な範囲: %q", s)
+		return 0, 0, fmt.Errorf("invalid range: %q", s)
 	}
 	if lo < spec.min || hi > spec.max || lo > hi {
-		return 0, 0, fmt.Errorf("範囲 %d-%d が境界外 [%d, %d]", lo, hi, spec.min, spec.max)
+		return 0, 0, fmt.Errorf("range %d-%d out of bounds [%d, %d]", lo, hi, spec.min, spec.max)
 	}
 	return lo, hi, nil
 }
