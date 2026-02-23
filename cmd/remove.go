@@ -53,11 +53,11 @@ func runRemove(_ *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("launchctlクライアントの初期化に失敗: %w", err)
 	}
-	if err := lc.Bootout(j.Label); err != nil {
+	if bootoutErr := lc.Bootout(j.Label); bootoutErr != nil {
 		if !removeForce {
-			return fmt.Errorf("launchctlからの削除に失敗: %w\n削除を強制するには --force フラグを使用してください", err)
+			return fmt.Errorf("launchctlからの削除に失敗: %w\n削除を強制するには --force フラグを使用してください", bootoutErr)
 		}
-		fmt.Fprintf(os.Stderr, "警告: bootoutに失敗しました（--forceで続行）: %v\n", err)
+		fmt.Fprintf(os.Stderr, "警告: bootoutに失敗しました（--forceで続行）: %v\n", bootoutErr)
 	}
 
 	// Remove plist file.
