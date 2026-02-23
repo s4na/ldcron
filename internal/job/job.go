@@ -9,7 +9,7 @@ import (
 
 // Job represents a single ldcron-managed launchd job.
 type Job struct {
-	// ID is the unique 8-character hex identifier derived from Schedule+Args.
+	// ID is the unique 16-character hex identifier derived from Schedule+Args.
 	ID string
 	// Label is the launchd service label: com.ldcron.<ID>
 	Label string
