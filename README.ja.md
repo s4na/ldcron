@@ -36,7 +36,7 @@ ldcron add "0 12 * * *" /usr/local/bin/backup.sh
 ### Homebrew（推奨）
 
 ```bash
-brew tap s4na/ldcron
+brew tap s4na/ldcron https://github.com/s4na/ldcron
 brew install ldcron
 ```
 
