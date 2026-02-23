@@ -41,6 +41,27 @@ var version = "0.1.5"
 - 片方を編集したら、もう片方も同じ内容に更新する
 - 両ファイルに差分がある場合は、実装コードを確認した上で正しい方に合わせて両方を更新する
 
+## launchd との完全互換性
+
+ldcron はネイティブの launchd と完全互換であることを設計原則とする。
+
+### ランタイム非依存
+
+- ldcron が生成する plist は標準の launchd plist フォーマット（`StartCalendarInterval`・`ProgramArguments` 等）を使用する
+- ジョブの実行には ldcron バイナリは不要。launchd が直接コマンドを実行する
+- ldcron をアンインストールしても、登録済みジョブはスケジュール通りに動作し続ける
+- `X-Ldcron-Schedule` カスタムキーはメタデータ用途のみ。launchd はこれを無視する
+
+### 既存 plist の管理
+
+- `ldcron list` / `remove` / `run` は `~/Library/LaunchAgents/` にある **すべての plist** を対象とする（`com.ldcron.*` 以外も含む）
+- ldcron 管理ジョブ: ファイル名 `com.ldcron.<id>.plist` かつ `X-Ldcron-Schedule` キーを持つ → 短い hex ID で操作
+- 外部ジョブ: その他の plist → launchd ラベル全体が ID として使われる
+
+### 新機能追加時の注意
+
+launchd との互換性を損なう変更（plist 形式の変更、独自キーの必須化など）は破壊的変更とみなし、major バージョンをインクリメントすること。
+
 ## コーディング規約
 
 - Go の標準スタイルに従う（`gofmt`、`golangci-lint` 通過必須）

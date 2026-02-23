@@ -9,6 +9,10 @@
 
 ldcronは、使い慣れたcron記法とmacOSの`launchd`エージェントシステムをつなぐ、シンプルなCLIです。plistファイルを一切書かずに、ジョブの登録・削除・一覧・実行が行えます。
 
+ldcronは**ネイティブのlaunchdと完全互換**です：
+- ldcronで登録したジョブは、標準のlaunchd plistファイルとして保存されます。ldcronを使わなくなっても、登録済みのジョブはそのまま動作し続けます。実行時にldcronバイナリへの依存はありません。
+- `ldcron list`・`ldcron remove`・`ldcron run`は、ldcronで作成したジョブだけでなく、`~/Library/LaunchAgents/`にある**すべてのplist**を操作できます。既存のlaunchdエージェントもldcronで管理できます。
+
 [English README](README.md)
 
 ---
@@ -106,11 +110,14 @@ ldcron add "0 9-17 * * 1-5" /usr/local/bin/sync.sh
 ldcron list
 ```
 
+`~/Library/LaunchAgents/`にある**すべての**plistを表示します（ldcron以外で作成したジョブも含む）。外部ジョブはlaunchdラベル全体がIDとして表示され、cron式が保存されていない場合はスケジュール欄に`-`が表示されます。
+
 ```
-ID        SCHEDULE        COMMAND
---------  --------------- ----------------------------------
-a1b2c3d4  0 12 * * *      /usr/local/bin/backup.sh
-e5f6a7b8  */5 * * * *     /usr/bin/ruby /path/to/worker.rb
+ID                        SCHEDULE        COMMAND
+----------------          --------------- ----------------------------------
+a1b2c3d4e5f6a7b8          0 12 * * *      /usr/local/bin/backup.sh
+e5f6a7b8a1b2c3d4          */5 * * * *     /usr/bin/ruby /path/to/worker.rb
+com.apple.ccachefixer     -               /usr/libexec/ccachefixer
 ```
 
 ---
@@ -121,10 +128,11 @@ e5f6a7b8  */5 * * * *     /usr/bin/ruby /path/to/worker.rb
 ldcron remove <id>
 ```
 
-launchdエージェントをアンロードし、対応するplistファイルを削除します。
+launchdエージェントをアンロードし、対応するplistファイルを削除します。ldcron管理ジョブは短いhex IDで、外部ジョブはlaunchdラベル全体で指定します。
 
 ```bash
-ldcron remove a1b2c3d4
+ldcron remove a1b2c3d4e5f6a7b8
+ldcron remove com.apple.ccachefixer
 ```
 
 ```
@@ -142,14 +150,17 @@ ldcron remove a1b2c3d4
 ldcron run [--force] <id>
 ```
 
-`launchctl kickstart`でジョブをトリガーします。実行は非同期です。出力はログファイルで確認してください。
+`launchctl kickstart`でジョブをトリガーします。実行は非同期です。ldcron管理ジョブはログパスが表示されます。外部ジョブのログはそのplistの`StandardOutPath`設定を参照してください。
 
 ```bash
-ldcron run a1b2c3d4
-tail -f ~/Library/Logs/ldcron/a1b2c3d4.log
+ldcron run a1b2c3d4e5f6a7b8
+tail -f ~/Library/Logs/ldcron/a1b2c3d4e5f6a7b8.log
+
+# 外部ジョブを即時実行する
+ldcron run com.apple.ccachefixer
 
 # 実行中のインスタンスを強制終了して再起動する場合
-ldcron run --force a1b2c3d4
+ldcron run --force a1b2c3d4e5f6a7b8
 ```
 
 ```
