@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/s4na/ldcron/internal/plist"
 )
@@ -64,9 +65,18 @@ func PlistPath(launchAgentsDir string, j *Job) string {
 	return filepath.Join(launchAgentsDir, j.Label+".plist")
 }
 
-// Remove deletes the plist file for the given job.
-func Remove(launchAgentsDir string, j *Job) error {
-	return os.Remove(PlistPath(launchAgentsDir, j))
+// Remove removes a job's plist file.
+// For ldcron-managed jobs the file is deleted. For external jobs the file is
+// renamed to "<path>.backup_YYYYMMDD_HHMM" so launchd no longer recognises it
+// but the original file is preserved. The backup path is returned (empty for
+// managed jobs).
+func Remove(launchAgentsDir string, j *Job) (string, error) {
+	path := PlistPath(launchAgentsDir, j)
+	if j.Managed {
+		return "", os.Remove(path)
+	}
+	backupPath := path + time.Now().Format(".backup_20060102_1504")
+	return backupPath, os.Rename(path, backupPath)
 }
 
 // fromPlist reconstructs a Job from a plist file path.

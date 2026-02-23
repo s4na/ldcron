@@ -61,13 +61,21 @@ func runRemove(_ *cobra.Command, args []string) error {
 	}
 
 	// Remove plist file.
-	if err := job.Remove(agentsDir, j); err != nil {
+	backupPath, err := job.Remove(agentsDir, j)
+	if err != nil {
 		return fmt.Errorf("plistの削除に失敗: %w", err)
 	}
 
-	fmt.Printf("ジョブを削除しました\n")
-	fmt.Printf("  ID:       %s\n", j.ID)
-	fmt.Printf("  スケジュール: %s\n", j.Schedule)
-	fmt.Printf("  コマンド:   %s\n", strings.Join(j.Args, " "))
+	if backupPath != "" {
+		fmt.Printf("管理外ジョブのplistをリネームしました（削除はされていません）\n")
+		fmt.Printf("  ID:         %s\n", j.ID)
+		fmt.Printf("  コマンド:     %s\n", strings.Join(j.Args, " "))
+		fmt.Printf("  バックアップ:   %s\n", backupPath)
+	} else {
+		fmt.Printf("ジョブを削除しました\n")
+		fmt.Printf("  ID:       %s\n", j.ID)
+		fmt.Printf("  スケジュール: %s\n", j.Schedule)
+		fmt.Printf("  コマンド:   %s\n", strings.Join(j.Args, " "))
+	}
 	return nil
 }
