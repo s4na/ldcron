@@ -81,3 +81,15 @@ func TestBootout_PropagatesError(t *testing.T) {
 		t.Fatal("expected error, got nil")
 	}
 }
+
+func TestKickstart_PropagatesError(t *testing.T) {
+	want := errors.New("kickstart failed")
+	c := newTestClient("gui/501", func(_ string, _ ...string) error { return want })
+	err := c.Kickstart("com.ldcron.abc12345")
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !errors.Is(err, want) {
+		t.Errorf("error: got %v, want wrapping %v", err, want)
+	}
+}

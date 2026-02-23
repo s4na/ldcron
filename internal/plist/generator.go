@@ -2,10 +2,12 @@
 package plist
 
 import (
+	"bytes"
 	"encoding/xml"
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/s4na/ldcron/internal/cron"
 )
@@ -20,9 +22,9 @@ func Generate(label, schedule string, args []string, logDir string) ([]byte, err
 	}
 
 	// Extract ID from label: com.ldcron.<id>
-	id := label
-	if len(label) > len("com.ldcron.") {
-		id = label[len("com.ldcron."):]
+	id := strings.TrimPrefix(label, "com.ldcron.")
+	if id == "" {
+		id = label
 	}
 	logPath := filepath.Join(logDir, id+".log")
 
@@ -157,7 +159,7 @@ func buildCalendarItems(entries []cron.CalendarEntry) []xmlNode {
 
 // parseScheduleFromXML reads X-Ldcron-Schedule and ProgramArguments from raw XML.
 func parseScheduleFromXML(data []byte) (string, []string, error) {
-	dec := xml.NewDecoder(byteReader(data))
+	dec := xml.NewDecoder(bytes.NewReader(data))
 	var schedule string
 	var args []string
 	var lastKey string
@@ -220,19 +222,3 @@ func decodeStringArray(dec *xml.Decoder, _ xml.StartElement) []string {
 	return result
 }
 
-// byteReader wraps []byte as an io.Reader.
-type byteSliceReader struct {
-	data []byte
-	pos  int
-}
-
-func byteReader(data []byte) *byteSliceReader { return &byteSliceReader{data: data} }
-
-func (r *byteSliceReader) Read(p []byte) (int, error) {
-	if r.pos >= len(r.data) {
-		return 0, fmt.Errorf("EOF")
-	}
-	n := copy(p, r.data[r.pos:])
-	r.pos += n
-	return n, nil
-}

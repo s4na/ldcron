@@ -2,6 +2,7 @@
 package job
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -22,6 +23,7 @@ func List(launchAgentsDir string) ([]*Job, error) {
 		j, err := fromPlist(path)
 		if err != nil {
 			// Skip files we cannot parse (could be manually edited).
+			fmt.Fprintf(os.Stderr, "警告: %s のパースをスキップします: %v\n", path, err)
 			continue
 		}
 		jobs = append(jobs, j)
@@ -55,11 +57,7 @@ func PlistPath(launchAgentsDir string, j *Job) string {
 
 // Remove deletes the plist file for the given job.
 func Remove(launchAgentsDir string, j *Job) error {
-	path := PlistPath(launchAgentsDir, j)
-	if err := os.Remove(path); err != nil {
-		return err
-	}
-	return nil
+	return os.Remove(PlistPath(launchAgentsDir, j))
 }
 
 // fromPlist reconstructs a Job from a plist file path.

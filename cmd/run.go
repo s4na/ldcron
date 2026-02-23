@@ -52,5 +52,6 @@ func runRun(_ *cobra.Command, args []string) error {
 	fmt.Printf("  ID:      %s\n", j.ID)
 	fmt.Printf("  コマンド: %s\n", strings.Join(j.Args, " "))
 	fmt.Printf("  ログ:    ~/Library/Logs/ldcron/%s.log\n", j.ID)
+	fmt.Printf("\nログをリアルタイムで確認:\n  tail -f ~/Library/Logs/ldcron/%s.log\n", j.ID)
 	return nil
 }

@@ -66,8 +66,7 @@ func runAdd(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("重複チェックに失敗: %w", err)
 	}
 	if dup != nil {
-		fmt.Fprintf(os.Stderr, "すでに登録済みです（ID: %s）\n", dup.ID)
-		os.Exit(1)
+		return fmt.Errorf("すでに登録済みです（ID: %s）", dup.ID)
 	}
 
 	// Write plist.
