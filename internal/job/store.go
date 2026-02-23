@@ -106,7 +106,7 @@ func fromPlist(path string) (*Job, error) {
 	}
 
 	if len(args) == 0 {
-		return nil, fmt.Errorf("ProgramArgumentsが見つかりません")
+		return nil, fmt.Errorf("ProgramArguments not found")
 	}
 
 	return &Job{

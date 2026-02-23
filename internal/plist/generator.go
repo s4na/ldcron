@@ -19,7 +19,7 @@ const scheduleKey = "X-Ldcron-Schedule"
 func Generate(label, schedule string, args []string, logDir string) ([]byte, error) {
 	entries, err := cron.ParseSchedule(schedule)
 	if err != nil {
-		return nil, fmt.Errorf("cron式のパースに失敗: %w", err)
+		return nil, fmt.Errorf("failed to parse cron expression: %w", err)
 	}
 
 	// Extract ID from label: com.ldcron.<id>
@@ -50,11 +50,11 @@ func Write(dir, label, schedule string, args []string, logDir string) (string, e
 		return "", err
 	}
 	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return "", fmt.Errorf("LaunchAgentsディレクトリの作成に失敗: %w", err)
+		return "", fmt.Errorf("failed to create LaunchAgents directory: %w", err)
 	}
 	path := filepath.Join(dir, label+".plist")
 	if err := os.WriteFile(path, data, 0o644); err != nil {
-		return "", fmt.Errorf("plistの書き込みに失敗: %w", err)
+		return "", fmt.Errorf("failed to write plist: %w", err)
 	}
 	return path, nil
 }
@@ -91,7 +91,7 @@ func parsePlistInfoFromXML(data []byte) (label, schedule string, args []string, 
 		tok, xmlErr := dec.Token()
 		if xmlErr != nil {
 			if xmlErr != io.EOF {
-				err = fmt.Errorf("XMLのデコードに失敗: %w", xmlErr)
+				err = fmt.Errorf("failed to decode XML: %w", xmlErr)
 			}
 			break
 		}

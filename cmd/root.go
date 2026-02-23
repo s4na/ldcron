@@ -15,7 +15,7 @@ var rootCmd = &cobra.Command{
 	Version:      version,
 	Short:        "macOS launchd job manager with cron syntax",
 	SilenceUsage: true,
-	// 引数なしで実行された場合はヘルプを表示する。
+	// Show help when invoked without subcommands.
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return cmd.Help()
 	},
@@ -35,7 +35,7 @@ func init() {
 	rootCmd.AddCommand(removeCmd)
 	rootCmd.AddCommand(runCmd)
 
-	// サブコマンドのデフォルト help を保存してから、root 用カスタム help を設定する。
+	// Save the default subcommand help, then set a custom help for the root command.
 	defaultHelp := rootCmd.HelpFunc()
 	rootCmd.SetHelpFunc(func(cmd *cobra.Command, args []string) {
 		if cmd != rootCmd {

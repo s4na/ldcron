@@ -15,17 +15,18 @@ import (
 
 var addCmd = &cobra.Command{
 	Use:   "add <schedule> <command> [args...]",
-	Short: "cron式とコマンドでジョブを追加する",
-	Long: `cron形式のスケジュールとコマンドを指定してlaunchdジョブを登録します。
+	Short: "Add a job with a cron expression and command",
+	Long: `Register a launchd job with a cron schedule and command.
 
-スケジュールは5フィールドのcron式（分 時 日 月 曜日）で指定します。
-コマンドは絶対パスで指定する必要があります。
+The schedule must be a 5-field cron expression (minute hour day month weekday).
+The command must be specified as an absolute path.
 
-注意: ステップ式（*/5 など）は登録時刻からの相対間隔ではなく、絶対時刻でトリガーされます。
-  例: "*/5 * * * *" は :00, :05, :10 ... という固定時刻で発火します。
-  12:03 に登録した場合、最初の発火は 12:05 です（5分後の 12:08 ではありません）。
+Note: Step expressions (e.g. */5) trigger at fixed clock times, not relative to
+  the registration time.
+  Example: "*/5 * * * *" fires at :00, :05, :10 ...
+  If registered at 12:03, the first fire is at 12:05 (not 5 minutes later at 12:08).
 
-例:
+Examples:
   ldcron add "0 12 * * *" /usr/local/bin/myscript.sh
   ldcron add "*/5 * * * *" /usr/bin/ruby /path/to/script.rb --verbose`,
 	Args:         cobra.MinimumNArgs(2),
@@ -40,17 +41,17 @@ func runAdd(cmd *cobra.Command, args []string) error {
 	// Validate: command must be absolute path.
 	command := programArgs[0]
 	if !filepath.IsAbs(command) {
-		return fmt.Errorf("コマンドは絶対パスで指定してください: %q", command)
+		return fmt.Errorf("command must be an absolute path: %q", command)
 	}
 
 	// Validate: command must exist.
 	if _, err := os.Stat(command); err != nil {
-		return fmt.Errorf("コマンドが見つかりません: %q", command)
+		return fmt.Errorf("command not found: %q", command)
 	}
 
 	// Validate cron expression.
 	if _, err := cron.ParseSchedule(schedule); err != nil {
-		return fmt.Errorf("cron式が無効: %w", err)
+		return fmt.Errorf("invalid cron expression: %w", err)
 	}
 	for _, w := range cron.ValidateSchedule(schedule) {
 		fmt.Fprintln(os.Stderr, w)
@@ -70,37 +71,37 @@ func runAdd(cmd *cobra.Command, args []string) error {
 	// Check for duplicate.
 	dup, err := job.FindDuplicate(agentsDir, j)
 	if err != nil {
-		return fmt.Errorf("重複チェックに失敗: %w", err)
+		return fmt.Errorf("duplicate check failed: %w", err)
 	}
 	if dup != nil {
-		return fmt.Errorf("すでに登録済みです（ID: %s）", dup.ID)
+		return fmt.Errorf("job already registered (ID: %s)", dup.ID)
 	}
 
 	// Write plist.
 	plistPath, err := plist.Write(agentsDir, j.Label, j.Schedule, j.Args, logD)
 	if err != nil {
-		return fmt.Errorf("plistの生成に失敗: %w", err)
+		return fmt.Errorf("failed to generate plist: %w", err)
 	}
 
 	// Register with launchd.
 	lc, err := launchctl.New()
 	if err != nil {
 		if removeErr := os.Remove(plistPath); removeErr != nil {
-			fmt.Fprintf(os.Stderr, "警告: plistファイルの削除に失敗しました: %v\n  手動で削除してください: rm %s\n", removeErr, plistPath)
+			fmt.Fprintf(os.Stderr, "warning: failed to delete plist file: %v\n  please remove manually: rm %s\n", removeErr, plistPath)
 		}
-		return fmt.Errorf("launchctlクライアントの初期化に失敗: %w", err)
+		return fmt.Errorf("failed to initialize launchctl client: %w", err)
 	}
 	if err := lc.Bootstrap(plistPath); err != nil {
 		if removeErr := os.Remove(plistPath); removeErr != nil {
-			fmt.Fprintf(os.Stderr, "警告: plistファイルの削除に失敗しました: %v\n  手動で削除してください: rm %s\n", removeErr, plistPath)
+			fmt.Fprintf(os.Stderr, "warning: failed to delete plist file: %v\n  please remove manually: rm %s\n", removeErr, plistPath)
 		}
-		return fmt.Errorf("launchctlへの登録に失敗: %w", err)
+		return fmt.Errorf("failed to register with launchctl: %w", err)
 	}
 
-	fmt.Printf("ジョブを追加しました\n")
+	fmt.Printf("Job added\n")
 	fmt.Printf("  ID:       %s\n", j.ID)
-	fmt.Printf("  スケジュール: %s\n", j.Schedule)
-	fmt.Printf("  コマンド:   %s\n", strings.Join(j.Args, " "))
-	fmt.Printf("  ログ:      %s/%s.log\n", logD, j.ID)
+	fmt.Printf("  Schedule: %s\n", j.Schedule)
+	fmt.Printf("  Command:  %s\n", strings.Join(j.Args, " "))
+	fmt.Printf("  Log:      %s/%s.log\n", logD, j.ID)
 	return nil
 }

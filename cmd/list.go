@@ -12,7 +12,7 @@ import (
 
 var listCmd = &cobra.Command{
 	Use:          "list",
-	Short:        "登録済みジョブを一覧表示する",
+	Short:        "List all registered jobs",
 	Args:         cobra.NoArgs,
 	SilenceUsage: true,
 	RunE:         runList,
@@ -26,11 +26,11 @@ func runList(_ *cobra.Command, _ []string) error {
 
 	jobs, warnings, err := job.List(agentsDir)
 	if err != nil {
-		return fmt.Errorf("ジョブ一覧の取得に失敗: %w", err)
+		return fmt.Errorf("failed to list jobs: %w", err)
 	}
 
 	if len(jobs) == 0 && len(warnings) == 0 {
-		fmt.Println("登録済みのジョブはありません。")
+		fmt.Println("No registered jobs.")
 		return nil
 	}
 
