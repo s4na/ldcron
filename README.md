@@ -11,6 +11,10 @@
 
 ldcron is a minimal CLI that bridges the gap between the cron expressions you already know and the `launchd` agent system on macOS — without ever touching a plist file.
 
+ldcron is **fully compatible with native launchd**:
+- Jobs registered through ldcron are standard launchd plist files. If you stop using ldcron, all jobs continue running exactly as before — no dependency on the ldcron binary at runtime.
+- `ldcron list`, `ldcron remove`, and `ldcron run` work on **any** plist in `~/Library/LaunchAgents/`, not just the ones ldcron created. You can use ldcron to manage your existing launchd agents.
+
 ---
 
 ## Why ldcron?
@@ -106,11 +110,14 @@ Job added
 ldcron list
 ```
 
+Lists **all** plist files in `~/Library/LaunchAgents/`, including jobs not created by ldcron. For external jobs, the full launchd label is shown as the ID and the schedule column shows `-` if no cron expression is stored.
+
 ```
-ID        SCHEDULE        COMMAND
---------  --------------- ----------------------------------
-a1b2c3d4  0 12 * * *      /usr/local/bin/backup.sh
-e5f6a7b8  */5 * * * *     /usr/bin/ruby /path/to/worker.rb
+ID                        SCHEDULE        COMMAND
+--------                  --------------- ----------------------------------
+a1b2c3d4e5f6a7b8          0 12 * * *      /usr/local/bin/backup.sh
+e5f6a7b8a1b2c3d4          */5 * * * *     /usr/bin/ruby /path/to/worker.rb
+com.apple.ccachefixer     -               /usr/libexec/ccachefixer
 ```
 
 ---
@@ -121,10 +128,11 @@ e5f6a7b8  */5 * * * *     /usr/bin/ruby /path/to/worker.rb
 ldcron remove <id>
 ```
 
-Unloads the launchd agent and deletes the corresponding plist file.
+Unloads the launchd agent and deletes the corresponding plist file. For ldcron-managed jobs use the short hex ID; for external jobs use the full launchd label.
 
 ```bash
-ldcron remove a1b2c3d4
+ldcron remove a1b2c3d4e5f6a7b8
+ldcron remove com.apple.ccachefixer
 ```
 
 ```
@@ -142,14 +150,17 @@ Job removed
 ldcron run [--force] <id>
 ```
 
-Triggers the job via `launchctl kickstart`. Execution is asynchronous; use the log file to observe output.
+Triggers the job via `launchctl kickstart`. Execution is asynchronous. For ldcron-managed jobs, the log path is printed; for external jobs, consult the plist's own `StandardOutPath` configuration.
 
 ```bash
-ldcron run a1b2c3d4
-tail -f ~/Library/Logs/ldcron/a1b2c3d4.log
+ldcron run a1b2c3d4e5f6a7b8
+tail -f ~/Library/Logs/ldcron/a1b2c3d4e5f6a7b8.log
+
+# Run an external job immediately
+ldcron run com.apple.ccachefixer
 
 # Force restart even if the job is currently running
-ldcron run --force a1b2c3d4
+ldcron run --force a1b2c3d4e5f6a7b8
 ```
 
 ```

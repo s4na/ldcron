@@ -51,10 +51,16 @@ func TestList_ReturnsAllJobs(t *testing.T) {
 	}
 }
 
-func TestList_SkipsNonLdcronPlists(t *testing.T) {
+func TestList_IncludesExternalPlists(t *testing.T) {
 	dir := t.TempDir()
-	// Write a non-ldcron plist; it should not be picked up by List.
-	if err := os.WriteFile(filepath.Join(dir, "com.apple.foo.plist"), []byte("<plist/>"), 0o644); err != nil {
+	// Write a minimal external plist (no X-Ldcron-Schedule).
+	externalPlist := `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+	<key>Label</key><string>com.apple.foo</string>
+	<key>ProgramArguments</key><array><string>/usr/bin/foo</string></array>
+</dict></plist>`
+	if err := os.WriteFile(filepath.Join(dir, "com.apple.foo.plist"), []byte(externalPlist), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -62,8 +68,72 @@ func TestList_SkipsNonLdcronPlists(t *testing.T) {
 	if err != nil {
 		t.Fatalf("List: %v", err)
 	}
+	if len(jobs) != 1 {
+		t.Errorf("expected 1 job, got %d", len(jobs))
+	}
+	if jobs[0].ID != "com.apple.foo" {
+		t.Errorf("ID: got %q, want %q", jobs[0].ID, "com.apple.foo")
+	}
+	if jobs[0].Managed {
+		t.Error("expected Managed=false for external job")
+	}
+	if jobs[0].Schedule != "" {
+		t.Errorf("Schedule: got %q, want empty", jobs[0].Schedule)
+	}
+}
+
+func TestList_ManagedFlagSetForLdcronJobs(t *testing.T) {
+	j := job.NewJob("0 12 * * *", []string{"/usr/bin/foo"})
+	dir := setupTestDir(t, j)
+
+	jobs, err := job.List(dir)
+	if err != nil {
+		t.Fatalf("List: %v", err)
+	}
+	if len(jobs) != 1 {
+		t.Fatalf("expected 1 job, got %d", len(jobs))
+	}
+	if !jobs[0].Managed {
+		t.Error("expected Managed=true for ldcron job")
+	}
+}
+
+func TestList_MalformedPlistSkipped(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "bad.plist"), []byte("not xml"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	// Malformed XML is silently skipped (warning to stderr).
+	jobs, err := job.List(dir)
+	if err != nil {
+		t.Fatalf("List: %v", err)
+	}
 	if len(jobs) != 0 {
-		t.Errorf("expected 0 jobs, got %d", len(jobs))
+		t.Errorf("expected 0 jobs for malformed plist, got %d", len(jobs))
+	}
+}
+
+func TestFind_ExternalJobByLabel(t *testing.T) {
+	dir := t.TempDir()
+	externalPlist := `<?xml version="1.0" encoding="UTF-8"?>
+<plist version="1.0"><dict>
+	<key>Label</key><string>com.example.myjob</string>
+	<key>ProgramArguments</key><array><string>/usr/bin/myjob</string></array>
+</dict></plist>`
+	if err := os.WriteFile(filepath.Join(dir, "com.example.myjob.plist"), []byte(externalPlist), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	found, err := job.Find(dir, "com.example.myjob")
+	if err != nil {
+		t.Fatalf("Find: %v", err)
+	}
+	if found == nil {
+		t.Fatal("expected job, got nil")
+	}
+	if found.Label != "com.example.myjob" {
+		t.Errorf("Label: got %q, want %q", found.Label, "com.example.myjob")
 	}
 }
 

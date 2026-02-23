@@ -68,6 +68,61 @@ func ReadSchedule(path string) (schedule string, args []string, err error) {
 	return parseScheduleFromXML(data)
 }
 
+// ReadPlistInfo reads Label, X-Ldcron-Schedule (optional), and ProgramArguments
+// from any launchd plist file. If X-Ldcron-Schedule is absent, schedule is
+// returned as an empty string without error. If Label is absent in the plist,
+// the filename stem is used as the label.
+func ReadPlistInfo(path string) (label, schedule string, args []string, err error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return "", "", nil, err
+	}
+	label, schedule, args = parsePlistInfoFromXML(data)
+	if label == "" {
+		base := filepath.Base(path)
+		label = strings.TrimSuffix(base, ".plist")
+	}
+	return label, schedule, args, nil
+}
+
+// parsePlistInfoFromXML reads Label, X-Ldcron-Schedule, and ProgramArguments
+// from raw plist XML without requiring X-Ldcron-Schedule to be present.
+func parsePlistInfoFromXML(data []byte) (label, schedule string, args []string) {
+	dec := xml.NewDecoder(bytes.NewReader(data))
+	var lastKey string
+	for {
+		tok, err := dec.Token()
+		if err != nil {
+			break
+		}
+		switch t := tok.(type) {
+		case xml.StartElement:
+			switch t.Name.Local {
+			case "key":
+				var s string
+				if e := dec.DecodeElement(&s, &t); e == nil {
+					lastKey = s
+				}
+			case "string":
+				var s string
+				if e := dec.DecodeElement(&s, &t); e == nil {
+					switch lastKey {
+					case "Label":
+						label = s
+					case scheduleKey:
+						schedule = s
+					}
+				}
+			case "array":
+				if lastKey == "ProgramArguments" {
+					args = decodeStringArray(dec, t)
+				}
+			}
+		}
+	}
+	return
+}
+
 // --- XML document model (hand-rolled to match Apple plist DTD) ---
 
 type plistDoc struct {

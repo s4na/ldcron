@@ -38,7 +38,11 @@ func runList(_ *cobra.Command, _ []string) error {
 	_, _ = fmt.Fprintln(w, "ID\tSCHEDULE\tCOMMAND")
 	_, _ = fmt.Fprintln(w, "--------\t---------\t-------")
 	for _, j := range jobs {
-		_, _ = fmt.Fprintf(w, "%s\t%s\t%s\n", j.ID, j.Schedule, strings.Join(j.Args, " "))
+		schedule := j.Schedule
+		if schedule == "" {
+			schedule = "-"
+		}
+		_, _ = fmt.Fprintf(w, "%s\t%s\t%s\n", j.ID, schedule, strings.Join(j.Args, " "))
 	}
 	return w.Flush()
 }

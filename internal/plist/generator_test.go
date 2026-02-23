@@ -81,6 +81,84 @@ func TestGenerate_InvalidScheduleError(t *testing.T) {
 	}
 }
 
+func TestReadPlistInfo_LdcronManagedPlist(t *testing.T) {
+	j := job.NewJob("0 9 * * 1-5", []string{"/usr/bin/ruby", "/path/to/script.rb"})
+	data, err := plist.Generate(j.Label, j.Schedule, j.Args, "/tmp/logs")
+	if err != nil {
+		t.Fatalf("Generate: %v", err)
+	}
+
+	tmp := t.TempDir()
+	path := filepath.Join(tmp, j.Label+".plist")
+	if err = os.WriteFile(path, data, 0o644); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+
+	label, schedule, args, err := plist.ReadPlistInfo(path)
+	if err != nil {
+		t.Fatalf("ReadPlistInfo: %v", err)
+	}
+	if label != j.Label {
+		t.Errorf("label: got %q, want %q", label, j.Label)
+	}
+	if schedule != "0 9 * * 1-5" {
+		t.Errorf("schedule: got %q, want %q", schedule, "0 9 * * 1-5")
+	}
+	if len(args) != 2 {
+		t.Errorf("args: got %v", args)
+	}
+}
+
+func TestReadPlistInfo_ExternalPlistNoSchedule(t *testing.T) {
+	externalPlist := `<?xml version="1.0" encoding="UTF-8"?>
+<plist version="1.0"><dict>
+	<key>Label</key><string>com.apple.example</string>
+	<key>ProgramArguments</key><array><string>/usr/bin/example</string><string>--flag</string></array>
+</dict></plist>`
+
+	tmp := t.TempDir()
+	path := filepath.Join(tmp, "com.apple.example.plist")
+	if err := os.WriteFile(path, []byte(externalPlist), 0o644); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+
+	label, schedule, args, err := plist.ReadPlistInfo(path)
+	if err != nil {
+		t.Fatalf("ReadPlistInfo: %v", err)
+	}
+	if label != "com.apple.example" {
+		t.Errorf("label: got %q, want %q", label, "com.apple.example")
+	}
+	if schedule != "" {
+		t.Errorf("schedule: got %q, want empty", schedule)
+	}
+	if len(args) != 2 || args[0] != "/usr/bin/example" || args[1] != "--flag" {
+		t.Errorf("args: got %v", args)
+	}
+}
+
+func TestReadPlistInfo_FallsBackToFilename(t *testing.T) {
+	// Plist without Label key.
+	noLabelPlist := `<?xml version="1.0" encoding="UTF-8"?>
+<plist version="1.0"><dict>
+	<key>ProgramArguments</key><array><string>/usr/bin/foo</string></array>
+</dict></plist>`
+
+	tmp := t.TempDir()
+	path := filepath.Join(tmp, "com.example.nolabel.plist")
+	if err := os.WriteFile(path, []byte(noLabelPlist), 0o644); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+
+	label, _, _, err := plist.ReadPlistInfo(path)
+	if err != nil {
+		t.Fatalf("ReadPlistInfo: %v", err)
+	}
+	if label != "com.example.nolabel" {
+		t.Errorf("label: got %q, want %q", label, "com.example.nolabel")
+	}
+}
+
 func TestReadSchedule_RoundTrip(t *testing.T) {
 	j := job.NewJob("30 9 * * 1-5", []string{"/usr/bin/ruby", "/path/to/script.rb"})
 	data, err := plist.Generate(j.Label, j.Schedule, j.Args, "/tmp/logs")
