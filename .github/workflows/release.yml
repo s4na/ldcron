@@ -76,15 +76,27 @@ jobs:
           TAG="${{ steps.version.outputs.tag }}"
           VERSION="${TAG#v}"
 
+          if [[ -z "${ARM64_SHA256}" || -z "${AMD64_SHA256}" ]]; then
+            echo "ERROR: SHA256 values are empty" >&2
+            exit 1
+          fi
+
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+          # タグ checkout によるデタッチド HEAD から main ブランチへ切り替える
           git fetch origin main
           git checkout main
 
+          # トップレベルの on_arm do / on_intel do ブロック（2スペースインデント）のみを対象とする
+          # def install 内のネストされたブロック（4スペースインデント）は変更しない
           sed -i '' "s/  version \"[^\"]*\"/  version \"${VERSION}\"/" Formula/ldcron.rb
-          sed -i '' "/on_arm do/,/^  end/{s/sha256 \"[^\"]*\"/sha256 \"${ARM64_SHA256}\"/;}" Formula/ldcron.rb
-          sed -i '' "/on_intel do/,/^  end/{s/sha256 \"[^\"]*\"/sha256 \"${AMD64_SHA256}\"/;}" Formula/ldcron.rb
+          sed -i '' "/^  on_arm do/,/^  end/{s/sha256 \"[^\"]*\"/sha256 \"${ARM64_SHA256}\"/;}" Formula/ldcron.rb
+          sed -i '' "/^  on_intel do/,/^  end/{s/sha256 \"[^\"]*\"/sha256 \"${AMD64_SHA256}\"/;}" Formula/ldcron.rb
 
           git add Formula/ldcron.rb
+          # [skip ci] により auto-release.yml の二重発火を防ぐ
+          # （actor チェックでも防止されるが明示的に付与する）
           git commit -m "chore: update Homebrew formula to ${TAG} [skip ci]"
+          # auto-release.yml の patch バンプと競合する可能性があるためリベースしてから push する
+          git pull --rebase origin main
           git push origin main
