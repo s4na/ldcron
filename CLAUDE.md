@@ -20,6 +20,13 @@ const version = "0.1.0"
 
 `rootCmd` には `Version: version` を設定すること（`--version` フラグが自動追加される）。
 
+## ブランチ運用
+
+- **remote の `main` ブランチを壊さない**
+- push 前に `git fetch origin main` で最新状態を確認する
+- ローカルと remote に差分がある場合は、`git merge origin/main` でマージしてから push する
+- force push は絶対に行わない
+
 ## コミット規約
 
 - コミット対象は **今回の作業範囲のファイルのみ** に限定する
