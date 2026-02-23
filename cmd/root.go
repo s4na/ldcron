@@ -22,6 +22,10 @@ cron式とコマンドパスを指定してlaunchdジョブを管理します。
   ldcron remove <id>
   ldcron run <id>`,
 	SilenceUsage: true,
+	// 引数なしで実行された場合はヘルプを表示する。
+	RunE: func(cmd *cobra.Command, args []string) error {
+		return cmd.Help()
+	},
 }
 
 // Execute runs the root command.
