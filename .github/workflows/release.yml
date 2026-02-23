@@ -4,6 +4,11 @@ on:
   push:
     tags:
       - 'v*'
+  # GITHUB_TOKEN で push されたタグはワークフローをトリガーしないため、
+  # auto-release.yml 完了後にも発火させる
+  workflow_run:
+    workflows: ["Auto Release"]
+    types: [completed]
 
 permissions:
   contents: write
@@ -12,10 +17,23 @@ jobs:
   release:
     name: Release
     runs-on: macos-latest
+    if: >
+      github.event_name == 'push' ||
+      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
     steps:
       - uses: actions/checkout@v6
         with:
           fetch-depth: 0
+
+      - name: Determine version
+        id: version
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_run" ]]; then
+            TAG=$(git describe --tags --abbrev=0)
+          else
+            TAG="${{ github.ref_name }}"
+          fi
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
 
       - name: Set up Go
         uses: actions/setup-go@v6
@@ -28,14 +46,14 @@ jobs:
 
       - name: Build (arm64)
         run: |
-          GOARCH=arm64 GOOS=darwin go build -ldflags="-s -w -X github.com/s4na/ldcron/cmd.version=${{ github.ref_name }}" \
+          GOARCH=arm64 GOOS=darwin go build -ldflags="-s -w -X github.com/s4na/ldcron/cmd.version=${{ steps.version.outputs.tag }}" \
             -o ldcron-darwin-arm64 .
           tar czf ldcron-darwin-arm64.tar.gz ldcron-darwin-arm64
           shasum -a 256 ldcron-darwin-arm64.tar.gz > ldcron-darwin-arm64.tar.gz.sha256
 
       - name: Build (amd64)
         run: |
-          GOARCH=amd64 GOOS=darwin go build -ldflags="-s -w -X github.com/s4na/ldcron/cmd.version=${{ github.ref_name }}" \
+          GOARCH=amd64 GOOS=darwin go build -ldflags="-s -w -X github.com/s4na/ldcron/cmd.version=${{ steps.version.outputs.tag }}" \
             -o ldcron-darwin-amd64 .
           tar czf ldcron-darwin-amd64.tar.gz ldcron-darwin-amd64
           shasum -a 256 ldcron-darwin-amd64.tar.gz > ldcron-darwin-amd64.tar.gz.sha256
@@ -43,6 +61,7 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ steps.version.outputs.tag }}
           files: |
             ldcron-darwin-arm64.tar.gz
             ldcron-darwin-arm64.tar.gz.sha256
