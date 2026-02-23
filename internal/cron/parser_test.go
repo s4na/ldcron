@@ -105,6 +105,36 @@ func TestParseSchedule_Valid(t *testing.T) {
 			expr:    "0-30/10 * * * *",
 			wantLen: 4, // 0, 10, 20, 30
 		},
+		{
+			// cron OR semantics: both day-of-month and weekday specified →
+			// fire on the 15th OR on Monday, not the intersection.
+			name:    "day-of-month and weekday OR semantics",
+			expr:    "0 0 15 * 1",
+			wantLen: 2, // {Minute:0,Hour:0,Day:15} + {Minute:0,Hour:0,Weekday:1}
+			check: func(t *testing.T, entries []cron.CalendarEntry) {
+				hasDayEntry, hasWeekdayEntry := false, false
+				for _, e := range entries {
+					if e.Day != nil && *e.Day == 15 && e.Weekday == nil {
+						hasDayEntry = true
+					}
+					if e.Weekday != nil && *e.Weekday == 1 && e.Day == nil {
+						hasWeekdayEntry = true
+					}
+				}
+				if !hasDayEntry {
+					t.Error("day-of-month entry (Day:15, no Weekday) not found")
+				}
+				if !hasWeekdayEntry {
+					t.Error("weekday entry (Weekday:1, no Day) not found")
+				}
+			},
+		},
+		{
+			// Multiple days + multiple weekdays: OR semantics.
+			name:    "multiple days and weekdays OR semantics",
+			expr:    "0 9 1,15 * 1-5",
+			wantLen: 7, // 2 day-of-month entries + 5 weekday entries
+		},
 	}
 
 	for _, tt := range tests {

@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/s4na/ldcron/internal/job"
@@ -9,16 +10,26 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var removeForce bool
+
 var removeCmd = &cobra.Command{
 	Use:   "remove <id>",
 	Short: "IDを指定してジョブを削除する",
 	Long: `指定したIDのジョブをlaunchdから削除しplistファイルを消去します。
 
+--force を指定すると、launchctlのbootoutが失敗した場合でもplistを強制削除します。
+launchdとplistの状態が乖離している場合の復旧に使用してください。
+
 例:
-  ldcron remove abc12345`,
+  ldcron remove abc12345
+  ldcron remove abc12345 --force`,
 	Args:         cobra.ExactArgs(1),
 	SilenceUsage: true,
 	RunE:         runRemove,
+}
+
+func init() {
+	removeCmd.Flags().BoolVarP(&removeForce, "force", "f", false, "bootout失敗時もplistを強制削除する")
 }
 
 func runRemove(_ *cobra.Command, args []string) error {
@@ -43,7 +54,10 @@ func runRemove(_ *cobra.Command, args []string) error {
 		return fmt.Errorf("launchctlクライアントの初期化に失敗: %w", err)
 	}
 	if err := lc.Bootout(j.Label); err != nil {
-		return fmt.Errorf("launchctlからの削除に失敗: %w", err)
+		if !removeForce {
+			return fmt.Errorf("launchctlからの削除に失敗: %w\n削除を強制するには --force フラグを使用してください", err)
+		}
+		fmt.Fprintf(os.Stderr, "警告: bootoutに失敗しました（--forceで続行）: %v\n", err)
 	}
 
 	// Remove plist file.

@@ -90,6 +90,6 @@ func runAdd(cmd *cobra.Command, args []string) error {
 	fmt.Printf("  ID:       %s\n", j.ID)
 	fmt.Printf("  スケジュール: %s\n", j.Schedule)
 	fmt.Printf("  コマンド:   %s\n", strings.Join(j.Args, " "))
-	fmt.Printf("  ログ:      ~/Library/Logs/ldcron/%s.log\n", j.ID)
+	fmt.Printf("  ログ:      %s/%s.log\n", logD, j.ID)
 	return nil
 }

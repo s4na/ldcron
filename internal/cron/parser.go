@@ -170,9 +170,32 @@ func parseRange(s string, dashIdx int, spec fieldSpec) (int, int, error) {
 	return lo, hi, nil
 }
 
-// buildEntries constructs the cartesian product of expanded fields.
-// Fields with nil slice are treated as wildcards (not included in entries).
+// buildEntries constructs CalendarEntry slices from expanded fields.
+// When both Day-of-Month (index 2) and Weekday (index 4) are non-wildcard,
+// traditional cron semantics require OR: fire on matching day-of-month OR
+// matching weekday. This is implemented by generating two independent entry
+// sets and concatenating them.
 func buildEntries(expanded [][]int) []CalendarEntry {
+	hasDay := expanded[2] != nil
+	hasWeekday := expanded[4] != nil
+
+	if hasDay && hasWeekday {
+		// OR semantics: day-of-month set (Weekday cleared) + weekday set (Day cleared).
+		withoutWeekday := make([][]int, 5)
+		copy(withoutWeekday, expanded)
+		withoutWeekday[4] = nil
+
+		withoutDay := make([][]int, 5)
+		copy(withoutDay, expanded)
+		withoutDay[2] = nil
+
+		return append(cartesianProduct(withoutWeekday), cartesianProduct(withoutDay)...)
+	}
+	return cartesianProduct(expanded)
+}
+
+// cartesianProduct builds the cross-product of all non-nil field value slices.
+func cartesianProduct(expanded [][]int) []CalendarEntry {
 	entries := []CalendarEntry{{}}
 	for fieldIdx, values := range expanded {
 		if values == nil {
