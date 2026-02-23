@@ -53,12 +53,10 @@ func TestList_ReturnsAllJobs(t *testing.T) {
 
 func TestList_SkipsNonLdcronPlists(t *testing.T) {
 	dir := t.TempDir()
-	// Write a non-ldcron plist
+	// Write a non-ldcron plist; it should not be picked up by List.
 	if err := os.WriteFile(filepath.Join(dir, "com.apple.foo.plist"), []byte("<plist/>"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	j := job.NewJob("0 12 * * *", []string{"/usr/bin/foo"})
-	setupTestDir(t, j) // Creates in its own temp dir; ignored here.
 
 	jobs, err := job.List(dir)
 	if err != nil {
