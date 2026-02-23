@@ -1,7 +1,9 @@
 name: Auto Release
 
 on:
-  push:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
     branches: [main]
 
 permissions:
@@ -11,7 +13,11 @@ jobs:
   auto-release:
     name: Bump version and release
     runs-on: ubuntu-latest
-    if: github.actor != 'github-actions[bot]'
+    # Only run when CI passes and the triggering actor is not the bot itself
+    # (the bot's version-bump commit also fires CI; skip that second invocation).
+    if: >
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.actor.login != 'github-actions[bot]'
     steps:
       - uses: actions/checkout@v6
         with:
