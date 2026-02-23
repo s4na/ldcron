@@ -50,17 +50,19 @@ func runRun(_ *cobra.Command, args []string) error {
 		return fmt.Errorf("ジョブが見つかりません: %s", id)
 	}
 
+	// Ensure the log directory exists before kickstarting so the process can
+	// write its output immediately on launch (mirrors the order in runAdd).
+	logD, err := logDir()
+	if err != nil {
+		return fmt.Errorf("ログディレクトリの取得に失敗: %w", err)
+	}
+
 	lc, err := launchctl.New()
 	if err != nil {
 		return fmt.Errorf("launchctlクライアントの初期化に失敗: %w", err)
 	}
 	if err = lc.Kickstart(j.Label, runForce); err != nil {
 		return fmt.Errorf("ジョブの実行に失敗: %w", err)
-	}
-
-	logD, err := logDir()
-	if err != nil {
-		return fmt.Errorf("ログディレクトリの取得に失敗: %w", err)
 	}
 
 	fmt.Printf("ジョブをバックグラウンドで起動しました\n")
