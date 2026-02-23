@@ -9,8 +9,8 @@ import (
 func TestParseSchedule_Valid(t *testing.T) {
 	tests := []struct {
 		name    string
-		expr    string
 		check   func(t *testing.T, entries []cron.CalendarEntry)
+		expr    string
 		wantLen int
 	}{
 		{
@@ -153,8 +153,8 @@ func TestParseSchedule_Valid(t *testing.T) {
 
 func TestParseSchedule_Macros(t *testing.T) {
 	tests := []struct {
-		macro   string
 		check   func(t *testing.T, entries []cron.CalendarEntry)
+		macro   string
 		wantLen int
 	}{
 		{
