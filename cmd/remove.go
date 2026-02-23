@@ -53,21 +53,29 @@ func runRemove(_ *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("launchctlクライアントの初期化に失敗: %w", err)
 	}
-	if err := lc.Bootout(j.Label); err != nil {
+	if bootoutErr := lc.Bootout(j.Label); bootoutErr != nil {
 		if !removeForce {
-			return fmt.Errorf("launchctlからの削除に失敗: %w\n削除を強制するには --force フラグを使用してください", err)
+			return fmt.Errorf("launchctlからの削除に失敗: %w\n削除を強制するには --force フラグを使用してください", bootoutErr)
 		}
-		fmt.Fprintf(os.Stderr, "警告: bootoutに失敗しました（--forceで続行）: %v\n", err)
+		fmt.Fprintf(os.Stderr, "警告: bootoutに失敗しました（--forceで続行）: %v\n", bootoutErr)
 	}
 
 	// Remove plist file.
-	if err := job.Remove(agentsDir, j); err != nil {
-		return fmt.Errorf("plistの削除に失敗: %w", err)
+	backupPath, err := job.Remove(agentsDir, j)
+	if err != nil {
+		return fmt.Errorf("plistの操作に失敗: %w", err)
 	}
 
-	fmt.Printf("ジョブを削除しました\n")
-	fmt.Printf("  ID:       %s\n", j.ID)
-	fmt.Printf("  スケジュール: %s\n", j.Schedule)
-	fmt.Printf("  コマンド:   %s\n", strings.Join(j.Args, " "))
+	if backupPath != "" {
+		fmt.Printf("管理外ジョブのplistをリネームしました（削除はされていません）\n")
+		fmt.Printf("  ID:         %s\n", j.ID)
+		fmt.Printf("  コマンド:     %s\n", strings.Join(j.Args, " "))
+		fmt.Printf("  バックアップ:   %s\n", backupPath)
+	} else {
+		fmt.Printf("ジョブを削除しました\n")
+		fmt.Printf("  ID:       %s\n", j.ID)
+		fmt.Printf("  スケジュール: %s\n", j.Schedule)
+		fmt.Printf("  コマンド:   %s\n", strings.Join(j.Args, " "))
+	}
 	return nil
 }

@@ -3,6 +3,7 @@ package job_test
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/s4na/ldcron/internal/job"
@@ -211,14 +212,62 @@ func TestFindDuplicate_NoDuplicateForDifferentJob(t *testing.T) {
 	}
 }
 
-func TestRemove_DeletesPlistFile(t *testing.T) {
+func TestRemove_ManagedJobDeletesPlistFile(t *testing.T) {
 	j := job.NewJob("0 12 * * *", []string{"/usr/bin/foo"})
 	dir := setupTestDir(t, j)
 
-	if err := job.Remove(dir, j); err != nil {
+	backupPath, err := job.Remove(dir, j)
+	if err != nil {
 		t.Fatalf("Remove: %v", err)
 	}
+	if backupPath != "" {
+		t.Errorf("expected empty backupPath for managed job, got %q", backupPath)
+	}
 	if _, err := os.Stat(job.PlistPath(dir, j)); !os.IsNotExist(err) {
-		t.Error("plist file should have been deleted")
+		t.Error("plist file should have been deleted for managed job")
+	}
+}
+
+func TestRemove_ExternalJobRenamesFile(t *testing.T) {
+	dir := t.TempDir()
+	externalPlist := `<?xml version="1.0" encoding="UTF-8"?>
+<plist version="1.0"><dict>
+	<key>Label</key><string>com.apple.foo</string>
+	<key>ProgramArguments</key><array><string>/usr/bin/foo</string></array>
+</dict></plist>`
+	plistPath := filepath.Join(dir, "com.apple.foo.plist")
+	if err := os.WriteFile(plistPath, []byte(externalPlist), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	found, err := job.Find(dir, "com.apple.foo")
+	if err != nil {
+		t.Fatalf("Find: %v", err)
+	}
+	if found == nil {
+		t.Fatal("job not found")
+	}
+
+	backupPath, err := job.Remove(dir, found)
+	if err != nil {
+		t.Fatalf("Remove: %v", err)
+	}
+	if backupPath == "" {
+		t.Error("expected non-empty backupPath for external job")
+	}
+
+	// Original plist should no longer exist.
+	if _, err := os.Stat(plistPath); !os.IsNotExist(err) {
+		t.Error("original plist should have been renamed away")
+	}
+
+	// Backup file should exist.
+	if _, err := os.Stat(backupPath); err != nil {
+		t.Errorf("backup file should exist: %v", err)
+	}
+
+	// Backup path should have the .backup_ suffix pattern.
+	if !strings.Contains(backupPath, ".backup_") {
+		t.Errorf("unexpected backup path format: %q", backupPath)
 	}
 }
