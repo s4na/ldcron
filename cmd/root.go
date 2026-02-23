@@ -49,46 +49,46 @@ func init() {
 func rootHelpText() string {
 	return fmt.Sprintf(`ldcron — macOS launchd job scheduler  v%s
 
-  macOS の launchd を使ってスケジュールジョブを管理する CLI ツールです。
-  cron 形式でスケジュールを指定し、指定時刻にコマンドを自動実行します。
+  A CLI tool for managing launchd jobs on macOS using cron syntax.
+  Automates plist generation, installation, registration, and removal.
 
-基本ワークフロー:
+Getting started:
 
-  1. ジョブを登録する
+  1. Register a job
        ldcron add "0 12 * * *" /usr/local/bin/backup.sh
-       → 毎日 12:00 に backup.sh を実行するジョブを登録します
+       → Schedules backup.sh to run every day at 12:00
 
-  2. 登録したジョブを確認する
+  2. List registered jobs
        ldcron list
-       → ID・スケジュール・コマンドの一覧を表示します
+       → Shows all jobs with their ID, schedule, and command
 
-  3. ジョブをテスト実行する
+  3. Test-run a job manually
        ldcron run <id>
-       → 今すぐ手動でジョブを起動してテストできます
+       → Triggers the job immediately without waiting for the schedule
 
-  4. 不要なジョブを削除する
+  4. Remove a job
        ldcron remove <id>
-       → launchd からジョブを登録解除してplistを削除します
+       → Unregisters the job from launchd and deletes the plist file
 
-コマンド:
+Commands:
 
-  add     <schedule> <command> [args...]   ジョブを新規登録する
-  list                                     登録済みジョブを一覧表示する
-  remove  <id>                             ジョブを削除する
-  run     <id>                             ジョブを即時実行する
+  add     <schedule> <command> [args...]   Register a new job
+  list                                     List all registered jobs
+  remove  <id>                             Delete a job by ID
+  run     <id>                             Run a job immediately
 
-cron 式のフォーマット（分 時 日 月 曜日）:
+Cron expression format (minute hour day month weekday):
 
-  "0 12 * * *"     毎日 12:00 に実行
-  "*/5 * * * *"    5 分おきに実行（:00, :05, :10 ... の固定時刻）
-  "0 9 * * 1-5"    平日（月〜金）の 9:00 に実行
-  "30 8 1 * *"     毎月 1 日の 8:30 に実行
+  "0 12 * * *"     Every day at 12:00
+  "*/5 * * * *"    Every 5 minutes at fixed times (:00, :05, :10 ...)
+  "0 9 * * 1-5"    Weekdays (Mon–Fri) at 9:00
+  "30 8 1 * *"     1st of every month at 8:30
 
-フラグ:
+Flags:
 
-  -h, --help      このヘルプを表示する
-  -v, --version   バージョン情報を表示する
+  -h, --help      Show this help message
+  -v, --version   Show version information
 
-詳細: ldcron <command> --help
+More: ldcron <command> --help
 `, version)
 }
