@@ -1,0 +1,51 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Release
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Run tests
+        run: go test -v -race -count=1 ./...
+
+      - name: Build (arm64)
+        run: |
+          GOARCH=arm64 GOOS=darwin go build -ldflags="-s -w -X main.version=${{ github.ref_name }}" \
+            -o ldcron-darwin-arm64 .
+          tar czf ldcron-darwin-arm64.tar.gz ldcron-darwin-arm64
+          shasum -a 256 ldcron-darwin-arm64.tar.gz > ldcron-darwin-arm64.tar.gz.sha256
+
+      - name: Build (amd64)
+        run: |
+          GOARCH=amd64 GOOS=darwin go build -ldflags="-s -w -X main.version=${{ github.ref_name }}" \
+            -o ldcron-darwin-amd64 .
+          tar czf ldcron-darwin-amd64.tar.gz ldcron-darwin-amd64
+          shasum -a 256 ldcron-darwin-amd64.tar.gz > ldcron-darwin-amd64.tar.gz.sha256
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            ldcron-darwin-arm64.tar.gz
+            ldcron-darwin-arm64.tar.gz.sha256
+            ldcron-darwin-amd64.tar.gz
+            ldcron-darwin-amd64.tar.gz.sha256
+          generate_release_notes: true

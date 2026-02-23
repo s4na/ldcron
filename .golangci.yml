@@ -1,0 +1,21 @@
+version: "2"
+
+linters:
+  enable:
+    - errcheck
+    - gosimple
+    - govet
+    - ineffassign
+    - staticcheck
+    - unused
+
+linters-settings:
+  govet:
+    enable-all: true
+
+issues:
+  exclude-rules:
+    # Test files have relaxed rules
+    - path: "_test\\.go"
+      linters:
+        - errcheck
