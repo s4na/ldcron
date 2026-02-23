@@ -63,7 +63,7 @@ func runRemove(_ *cobra.Command, args []string) error {
 	// Remove plist file.
 	backupPath, err := job.Remove(agentsDir, j)
 	if err != nil {
-		return fmt.Errorf("plistの削除に失敗: %w", err)
+		return fmt.Errorf("plistの操作に失敗: %w", err)
 	}
 
 	if backupPath != "" {
