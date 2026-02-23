@@ -24,12 +24,12 @@ func runList(_ *cobra.Command, _ []string) error {
 		return err
 	}
 
-	jobs, err := job.List(agentsDir)
+	jobs, warnings, err := job.List(agentsDir)
 	if err != nil {
 		return fmt.Errorf("ジョブ一覧の取得に失敗: %w", err)
 	}
 
-	if len(jobs) == 0 {
+	if len(jobs) == 0 && len(warnings) == 0 {
 		fmt.Println("登録済みのジョブはありません。")
 		return nil
 	}
@@ -43,6 +43,9 @@ func runList(_ *cobra.Command, _ []string) error {
 			schedule = "-"
 		}
 		_, _ = fmt.Fprintf(w, "%s\t%s\t%s\n", j.ID, schedule, strings.Join(j.Args, " "))
+	}
+	for _, warn := range warnings {
+		_, _ = fmt.Fprintf(w, "[WARNING]\t-\t%s: %v\n", warn.Path, warn.Err)
 	}
 	return w.Flush()
 }
