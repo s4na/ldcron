@@ -8,8 +8,11 @@ import (
 	"github.com/spf13/cobra"
 )
 
+const version = "0.1.0"
+
 var rootCmd = &cobra.Command{
-	Use:   "ldcron",
+	Use:     "ldcron",
+	Version: version,
 	Short: "cron形式でlaunchdジョブを管理するCLIツール",
 	Long: `ldcron - macOS launchd job manager with cron syntax
 

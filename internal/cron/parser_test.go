@@ -153,6 +153,89 @@ func TestParseSchedule_Valid(t *testing.T) {
 	}
 }
 
+func TestParseSchedule_Macros(t *testing.T) {
+	tests := []struct {
+		macro   string
+		wantLen int
+		check   func(t *testing.T, entries []cron.CalendarEntry)
+	}{
+		{
+			macro:   "@hourly",
+			wantLen: 1,
+			check: func(t *testing.T, entries []cron.CalendarEntry) {
+				e := entries[0]
+				if e.Minute == nil || *e.Minute != 0 {
+					t.Errorf("Minute: got %v, want 0", e.Minute)
+				}
+				if e.Hour != nil {
+					t.Errorf("Hour should be wildcard (nil), got %v", e.Hour)
+				}
+			},
+		},
+		{
+			macro:   "@daily",
+			wantLen: 1,
+			check: func(t *testing.T, entries []cron.CalendarEntry) {
+				e := entries[0]
+				if e.Minute == nil || *e.Minute != 0 {
+					t.Errorf("Minute: got %v, want 0", e.Minute)
+				}
+				if e.Hour == nil || *e.Hour != 0 {
+					t.Errorf("Hour: got %v, want 0", e.Hour)
+				}
+			},
+		},
+		{"@midnight", 1, nil},
+		{"@weekly", 1, nil},
+		{"@monthly", 1, nil},
+		{"@yearly", 1, nil},
+		{"@annually", 1, nil},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.macro, func(t *testing.T) {
+			entries, err := cron.ParseSchedule(tt.macro)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if len(entries) != tt.wantLen {
+				t.Errorf("len(entries): got %d, want %d", len(entries), tt.wantLen)
+			}
+			if tt.check != nil {
+				tt.check(t, entries)
+			}
+		})
+	}
+}
+
+func TestValidateSchedule(t *testing.T) {
+	tests := []struct {
+		expr     string
+		hasWarn  bool
+	}{
+		{"0 0 31 2 *", true},  // Feb 31 does not exist
+		{"0 0 30 2 *", true},  // Feb 30 does not exist
+		{"0 0 29 2 *", false}, // Feb 29 exists (leap year)
+		{"0 0 31 1 *", false}, // Jan 31 exists
+		{"0 0 31 * *", false}, // wildcard month — no warning
+		{"0 0 * 2 *", false},  // wildcard day — no warning
+		{"0 0 1 1 *", false},  // normal date
+		{"@daily", false},     // macro — no warning
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.expr, func(t *testing.T) {
+			warnings := cron.ValidateSchedule(tt.expr)
+			if tt.hasWarn && len(warnings) == 0 {
+				t.Errorf("expected warning for %q, got none", tt.expr)
+			}
+			if !tt.hasWarn && len(warnings) > 0 {
+				t.Errorf("unexpected warnings for %q: %v", tt.expr, warnings)
+			}
+		})
+	}
+}
+
 func TestParseSchedule_Invalid(t *testing.T) {
 	tests := []struct {
 		name string

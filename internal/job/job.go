@@ -30,9 +30,9 @@ func NewJob(schedule string, args []string) *Job {
 	}
 }
 
-// generateID produces an 8-character hex hash from schedule and args.
+// generateID produces a 16-character hex hash from schedule and args.
 func generateID(schedule string, args []string) string {
 	key := schedule + "\x00" + strings.Join(args, "\x00")
 	sum := sha256.Sum256([]byte(key))
-	return fmt.Sprintf("%x", sum[:4])
+	return fmt.Sprintf("%x", sum[:8])
 }

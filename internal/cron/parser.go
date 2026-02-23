@@ -34,9 +34,75 @@ var fieldSpecs = []fieldSpec{
 	{0, 7},  // weekday (0 and 7 both mean Sunday)
 }
 
-// ParseSchedule parses a 5-field cron expression and returns a list of
-// CalendarEntry values suitable for use in a launchd plist.
+// expandMacro converts @-style shorthand expressions to 5-field cron expressions.
+func expandMacro(expr string) (string, bool) {
+	switch strings.ToLower(expr) {
+	case "@yearly", "@annually":
+		return "0 0 1 1 *", true
+	case "@monthly":
+		return "0 0 1 * *", true
+	case "@weekly":
+		return "0 0 * * 0", true
+	case "@daily", "@midnight":
+		return "0 0 * * *", true
+	case "@hourly":
+		return "0 * * * *", true
+	}
+	return "", false
+}
+
+// maxDaysInMonth returns the maximum number of days in the given month (1-12).
+// February is treated as having 29 days (leap year).
+var maxDaysInMonth = [13]int{0, 31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31}
+
+// ValidateSchedule returns warning messages for valid-but-suspicious cron
+// expressions (e.g. "0 0 31 2 *" — February 31st never occurs).
+// An empty slice means no warnings.
+func ValidateSchedule(expr string) []string {
+	if expanded, ok := expandMacro(expr); ok {
+		expr = expanded
+	}
+	parts := strings.Fields(expr)
+	if len(parts) != 5 {
+		return nil // syntax errors are reported by ParseSchedule
+	}
+
+	// Only warn when both month and day-of-month are concrete (non-wildcard).
+	monthPart := parts[3]
+	dayPart := parts[2]
+	if monthPart == "*" || dayPart == "*" {
+		return nil
+	}
+
+	// Parse month values (ignore step/range complexity — just grab the first value).
+	months, monthWild, err := expandField(monthPart, fieldSpecs[3])
+	if err != nil || monthWild {
+		return nil
+	}
+	days, dayWild, err := expandField(dayPart, fieldSpecs[2])
+	if err != nil || dayWild {
+		return nil
+	}
+
+	var warnings []string
+	for _, m := range months {
+		max := maxDaysInMonth[m]
+		for _, d := range days {
+			if d > max {
+				warnings = append(warnings,
+					fmt.Sprintf("警告: %d月に%d日は存在しません — このスケジュールは実行されません", m, d))
+			}
+		}
+	}
+	return warnings
+}
+
+// ParseSchedule parses a 5-field cron expression (or @-macro) and returns a
+// list of CalendarEntry values suitable for use in a launchd plist.
 func ParseSchedule(expr string) ([]CalendarEntry, error) {
+	if expanded, ok := expandMacro(expr); ok {
+		expr = expanded
+	}
 	parts := strings.Fields(expr)
 	if len(parts) != 5 {
 		return nil, fmt.Errorf("cron式は5フィールド必要です (分 時 日 月 曜日): %q", expr)

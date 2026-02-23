@@ -45,8 +45,14 @@ func (c *Client) Bootout(label string) error {
 }
 
 // Kickstart triggers an immediate run of the service (non-blocking).
-func (c *Client) Kickstart(label string) error {
-	if err := c.run("launchctl", "kickstart", "-k", c.Domain+"/"+label); err != nil {
+// If force is true, any currently running instance is killed first (-k flag).
+func (c *Client) Kickstart(label string, force bool) error {
+	args := []string{"kickstart"}
+	if force {
+		args = append(args, "-k")
+	}
+	args = append(args, c.Domain+"/"+label)
+	if err := c.run("launchctl", args...); err != nil {
 		return fmt.Errorf("launchctl kickstart: %w", err)
 	}
 	return nil

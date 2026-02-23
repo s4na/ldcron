@@ -9,6 +9,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var runForce bool
+
 var runCmd = &cobra.Command{
 	Use:   "run <id>",
 	Short: "IDを指定してジョブを即時実行する",
@@ -17,11 +19,19 @@ var runCmd = &cobra.Command{
 実行はバックグラウンドで行われます。結果はログで確認してください:
   tail -f ~/Library/Logs/ldcron/<id>.log
 
+--force を指定すると、実行中のインスタンスを強制終了してから再起動します。
+強制終了が必要なければ --force は付けないでください。
+
 例:
-  ldcron run abc12345`,
+  ldcron run abc12345
+  ldcron run --force abc12345`,
 	Args:         cobra.ExactArgs(1),
 	SilenceUsage: true,
 	RunE:         runRun,
+}
+
+func init() {
+	runCmd.Flags().BoolVar(&runForce, "force", false, "実行中のインスタンスを強制終了してから起動する")
 }
 
 func runRun(_ *cobra.Command, args []string) error {
@@ -44,7 +54,7 @@ func runRun(_ *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("launchctlクライアントの初期化に失敗: %w", err)
 	}
-	if err := lc.Kickstart(j.Label); err != nil {
+	if err := lc.Kickstart(j.Label, runForce); err != nil {
 		return fmt.Errorf("ジョブの実行に失敗: %w", err)
 	}
 

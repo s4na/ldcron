@@ -8,8 +8,8 @@ import (
 
 func TestNewJob_IDAndLabel(t *testing.T) {
 	j := job.NewJob("0 12 * * *", []string{"/usr/local/bin/myscript.sh"})
-	if len(j.ID) != 8 {
-		t.Errorf("ID length: got %d, want 8", len(j.ID))
+	if len(j.ID) != 16 {
+		t.Errorf("ID length: got %d, want 16", len(j.ID))
 	}
 	want := "com.ldcron." + j.ID
 	if j.Label != want {

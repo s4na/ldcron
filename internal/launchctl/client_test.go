@@ -53,11 +53,26 @@ func TestKickstart_CommandArgs(t *testing.T) {
 		return nil
 	})
 
-	if err := c.Kickstart("com.ldcron.abc12345"); err != nil {
+	if err := c.Kickstart("com.ldcron.abc12345", false); err != nil {
+		t.Fatalf("Kickstart: %v", err)
+	}
+	if len(gotArgs) != 2 || gotArgs[0] != "kickstart" || gotArgs[1] != "gui/501/com.ldcron.abc12345" {
+		t.Errorf("args (no force): got %v", gotArgs)
+	}
+}
+
+func TestKickstart_ForceFlag(t *testing.T) {
+	var gotArgs []string
+	c := newTestClient("gui/501", func(_ string, args ...string) error {
+		gotArgs = args
+		return nil
+	})
+
+	if err := c.Kickstart("com.ldcron.abc12345", true); err != nil {
 		t.Fatalf("Kickstart: %v", err)
 	}
 	if len(gotArgs) != 3 || gotArgs[0] != "kickstart" || gotArgs[1] != "-k" || gotArgs[2] != "gui/501/com.ldcron.abc12345" {
-		t.Errorf("args: got %v", gotArgs)
+		t.Errorf("args (force): got %v", gotArgs)
 	}
 }
 
@@ -85,7 +100,7 @@ func TestBootout_PropagatesError(t *testing.T) {
 func TestKickstart_PropagatesError(t *testing.T) {
 	want := errors.New("kickstart failed")
 	c := newTestClient("gui/501", func(_ string, _ ...string) error { return want })
-	err := c.Kickstart("com.ldcron.abc12345")
+	err := c.Kickstart("com.ldcron.abc12345", false)
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}

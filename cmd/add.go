@@ -48,6 +48,9 @@ func runAdd(cmd *cobra.Command, args []string) error {
 	if _, err := cron.ParseSchedule(schedule); err != nil {
 		return fmt.Errorf("cron式が無効: %w", err)
 	}
+	for _, w := range cron.ValidateSchedule(schedule) {
+		fmt.Fprintln(os.Stderr, w)
+	}
 
 	agentsDir, err := launchAgentsDir()
 	if err != nil {
@@ -78,11 +81,15 @@ func runAdd(cmd *cobra.Command, args []string) error {
 	// Register with launchd.
 	lc, err := launchctl.New()
 	if err != nil {
-		_ = os.Remove(plistPath)
+		if removeErr := os.Remove(plistPath); removeErr != nil {
+			fmt.Fprintf(os.Stderr, "警告: plistファイルの削除に失敗しました: %v\n  手動で削除してください: rm %s\n", removeErr, plistPath)
+		}
 		return fmt.Errorf("launchctlクライアントの初期化に失敗: %w", err)
 	}
 	if err := lc.Bootstrap(plistPath); err != nil {
-		_ = os.Remove(plistPath)
+		if removeErr := os.Remove(plistPath); removeErr != nil {
+			fmt.Fprintf(os.Stderr, "警告: plistファイルの削除に失敗しました: %v\n  手動で削除してください: rm %s\n", removeErr, plistPath)
+		}
 		return fmt.Errorf("launchctlへの登録に失敗: %w", err)
 	}
 
