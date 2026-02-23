@@ -159,6 +159,32 @@ func TestReadPlistInfo_FallsBackToFilename(t *testing.T) {
 	}
 }
 
+func TestReadPlistInfo_ProgramKeyFallback(t *testing.T) {
+	// Plist using Program key instead of ProgramArguments.
+	programPlist := `<?xml version="1.0" encoding="UTF-8"?>
+<plist version="1.0"><dict>
+	<key>Label</key><string>com.example.daemon</string>
+	<key>Program</key><string>/usr/sbin/daemon</string>
+</dict></plist>`
+
+	tmp := t.TempDir()
+	path := filepath.Join(tmp, "com.example.daemon.plist")
+	if err := os.WriteFile(path, []byte(programPlist), 0o644); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+
+	label, _, args, err := plist.ReadPlistInfo(path)
+	if err != nil {
+		t.Fatalf("ReadPlistInfo: %v", err)
+	}
+	if label != "com.example.daemon" {
+		t.Errorf("label: got %q, want %q", label, "com.example.daemon")
+	}
+	if len(args) != 1 || args[0] != "/usr/sbin/daemon" {
+		t.Errorf("args: got %v, want [/usr/sbin/daemon]", args)
+	}
+}
+
 func TestReadSchedule_RoundTrip(t *testing.T) {
 	j := job.NewJob("30 9 * * 1-5", []string{"/usr/bin/ruby", "/path/to/script.rb"})
 	data, err := plist.Generate(j.Label, j.Schedule, j.Args, "/tmp/logs")

@@ -85,11 +85,14 @@ func ReadPlistInfo(path string) (label, schedule string, args []string, err erro
 	return label, schedule, args, nil
 }
 
-// parsePlistInfoFromXML reads Label, X-Ldcron-Schedule, and ProgramArguments
-// from raw plist XML without requiring X-Ldcron-Schedule to be present.
+// parsePlistInfoFromXML reads Label, X-Ldcron-Schedule, Program, and
+// ProgramArguments from raw plist XML without requiring X-Ldcron-Schedule to
+// be present. If ProgramArguments is absent but Program is set, args is
+// returned as []string{program} to support both launchd plist variants.
 func parsePlistInfoFromXML(data []byte) (label, schedule string, args []string) {
 	dec := xml.NewDecoder(bytes.NewReader(data))
 	var lastKey string
+	var program string
 	for {
 		tok, err := dec.Token()
 		if err != nil {
@@ -111,6 +114,8 @@ func parsePlistInfoFromXML(data []byte) (label, schedule string, args []string) 
 						label = s
 					case scheduleKey:
 						schedule = s
+					case "Program":
+						program = s
 					}
 				}
 			case "array":
@@ -119,6 +124,9 @@ func parsePlistInfoFromXML(data []byte) (label, schedule string, args []string) 
 				}
 			}
 		}
+	}
+	if len(args) == 0 && program != "" {
+		args = []string{program}
 	}
 	return
 }
