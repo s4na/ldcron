@@ -54,7 +54,7 @@ func runRun(_ *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("launchctlクライアントの初期化に失敗: %w", err)
 	}
-	if err := lc.Kickstart(j.Label, runForce); err != nil {
+	if err = lc.Kickstart(j.Label, runForce); err != nil {
 		return fmt.Errorf("ジョブの実行に失敗: %w", err)
 	}
 
