@@ -7,14 +7,14 @@ linters:
     - ineffassign
     - staticcheck
     - unused
-
-linters-settings:
-  govet:
-    enable-all: true
+  settings:
+    govet:
+      enable-all: true
 
 issues:
-  exclude-rules:
-    # Test files have relaxed rules
-    - path: "_test\\.go"
-      linters:
-        - errcheck
+  exclusions:
+    rules:
+      # Test files have relaxed rules
+      - path: "_test\\.go"
+        linters:
+          - errcheck
