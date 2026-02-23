@@ -139,7 +139,7 @@ Job removed
 ### `run` — Run a job immediately
 
 ```
-ldcron run <id>
+ldcron run [--force] <id>
 ```
 
 Triggers the job via `launchctl kickstart`. Execution is asynchronous; use the log file to observe output.
@@ -147,6 +147,9 @@ Triggers the job via `launchctl kickstart`. Execution is asynchronous; use the l
 ```bash
 ldcron run a1b2c3d4
 tail -f ~/Library/Logs/ldcron/a1b2c3d4.log
+
+# Force restart even if the job is currently running
+ldcron run --force a1b2c3d4
 ```
 
 ```
@@ -155,6 +158,8 @@ Job started in background
   Command: /usr/local/bin/backup.sh
   Log:     ~/Library/Logs/ldcron/a1b2c3d4.log
 ```
+
+> **Note:** Without `--force`, running a job that is already executing will return an error. `--force` kills the running instance before restarting — use it only when you intend to interrupt an in-progress run.
 
 ---
 
@@ -181,13 +186,19 @@ ldcron uses the standard 5-field cron format:
 | List            | `0 9,12,18 * * *`     | At 9:00, 12:00, and 18:00          |
 | Range with step | `0-30/10 * * * *`     | Minutes 0, 10, 20, 30              |
 | Day of week     | `0 9 * * 1-5`         | Weekdays at 9:00                   |
+| `@hourly`       | `@hourly`             | Equivalent to `0 * * * *`         |
+| `@daily`        | `@daily`              | Equivalent to `0 0 * * *`         |
+| `@weekly`       | `@weekly`             | Equivalent to `0 0 * * 0`         |
+| `@monthly`      | `@monthly`            | Equivalent to `0 0 1 * *`         |
+| `@yearly`       | `@yearly`             | Equivalent to `0 0 1 1 *`         |
 
 ### Common patterns
 
 ```bash
 "* * * * *"        # every minute
-"*/5 * * * *"      # every 5 minutes
+"*/5 * * * *"      # every 5 minutes (at :00, :05, :10 … not relative to start time)
 "0 0 * * *"        # daily at midnight
+"@daily"           # same as above
 "0 9 * * 1-5"      # weekdays at 9:00
 "30 8 1 * *"       # 1st of every month at 8:30
 ```
@@ -222,6 +233,8 @@ tail -n 100 ~/Library/Logs/ldcron/a1b2c3d4.log
 - **Absolute paths only.** launchd does not run commands in a login shell, so `$PATH` is not expanded. Use `which <command>` to find the full path.
 - **No shell wrapper.** Shell built-ins and pipes require an explicit interpreter: `ldcron add "* * * * *" /bin/sh -c 'echo hello >> /tmp/out.txt'`
 - **`run` is asynchronous.** ldcron does not wait for the job to finish. Check the log for results.
+- **`run --force` kills running processes.** Without `--force`, starting an already-running job returns an error. `--force` terminates the running instance immediately before restarting. Use with care.
+- **Step expressions use absolute clock times.** `*/5 * * * *` fires at minutes :00, :05, :10 … regardless of when the job was registered — not 5 minutes after the last run.
 - **Login session only.** Jobs are loaded into the `gui/<uid>` launchd domain and run only while you are logged in. They are not suitable for system-level or headless tasks.
 
 ---
