@@ -10,31 +10,39 @@ import (
 	"github.com/s4na/ldcron/internal/plist"
 )
 
+// ParseWarning represents a plist file that could not be parsed.
+type ParseWarning struct {
+	Err  error
+	Path string
+}
+
 // List returns all launchd jobs found in launchAgentsDir, including both
 // ldcron-managed jobs and any other existing plist files.
-func List(launchAgentsDir string) ([]*Job, error) {
+// ParseWarnings contains entries for plist files that could not be parsed.
+func List(launchAgentsDir string) ([]*Job, []ParseWarning, error) {
 	pattern := filepath.Join(launchAgentsDir, "*.plist")
 	matches, err := filepath.Glob(pattern)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	var jobs []*Job
+	var warnings []ParseWarning
 	for _, path := range matches {
 		j, err := fromPlist(path)
 		if err != nil {
-			// Skip files we cannot parse (e.g. malformed XML).
-			fmt.Fprintf(os.Stderr, "警告: %s のパースをスキップします: %v\n", path, err)
+			warnings = append(warnings, ParseWarning{Path: path, Err: err})
 			continue
 		}
 		jobs = append(jobs, j)
 	}
-	return jobs, nil
+	return jobs, warnings, nil
 }
 
 // Find returns the job with the given ID, or nil if not found.
+// Parse warnings for broken plist files are silently ignored.
 func Find(launchAgentsDir, id string) (*Job, error) {
-	jobs, err := List(launchAgentsDir)
+	jobs, _, err := List(launchAgentsDir)
 	if err != nil {
 		return nil, err
 	}

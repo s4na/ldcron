@@ -28,12 +28,15 @@ func setupTestDir(t *testing.T, jobs ...*job.Job) string {
 
 func TestList_EmptyDir(t *testing.T) {
 	dir := t.TempDir()
-	jobs, err := job.List(dir)
+	jobs, warnings, err := job.List(dir)
 	if err != nil {
 		t.Fatalf("List: %v", err)
 	}
 	if len(jobs) != 0 {
 		t.Errorf("expected 0 jobs, got %d", len(jobs))
+	}
+	if len(warnings) != 0 {
+		t.Errorf("expected 0 warnings, got %d", len(warnings))
 	}
 }
 
@@ -42,12 +45,15 @@ func TestList_ReturnsAllJobs(t *testing.T) {
 	j2 := job.NewJob("0 13 * * *", []string{"/usr/bin/bar"})
 	dir := setupTestDir(t, j1, j2)
 
-	jobs, err := job.List(dir)
+	jobs, warnings, err := job.List(dir)
 	if err != nil {
 		t.Fatalf("List: %v", err)
 	}
 	if len(jobs) != 2 {
 		t.Errorf("expected 2 jobs, got %d", len(jobs))
+	}
+	if len(warnings) != 0 {
+		t.Errorf("expected 0 warnings, got %d", len(warnings))
 	}
 }
 
@@ -64,12 +70,15 @@ func TestList_IncludesExternalPlists(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	jobs, err := job.List(dir)
+	jobs, warnings, err := job.List(dir)
 	if err != nil {
 		t.Fatalf("List: %v", err)
 	}
 	if len(jobs) != 1 {
 		t.Errorf("expected 1 job, got %d", len(jobs))
+	}
+	if len(warnings) != 0 {
+		t.Errorf("expected 0 warnings, got %d", len(warnings))
 	}
 	if jobs[0].ID != "com.apple.foo" {
 		t.Errorf("ID: got %q, want %q", jobs[0].ID, "com.apple.foo")
@@ -86,7 +95,7 @@ func TestList_ManagedFlagSetForLdcronJobs(t *testing.T) {
 	j := job.NewJob("0 12 * * *", []string{"/usr/bin/foo"})
 	dir := setupTestDir(t, j)
 
-	jobs, err := job.List(dir)
+	jobs, _, err := job.List(dir)
 	if err != nil {
 		t.Fatalf("List: %v", err)
 	}
@@ -98,19 +107,28 @@ func TestList_ManagedFlagSetForLdcronJobs(t *testing.T) {
 	}
 }
 
-func TestList_MalformedPlistSkipped(t *testing.T) {
+func TestList_MalformedPlistReturnsWarning(t *testing.T) {
 	dir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(dir, "bad.plist"), []byte("not xml"), 0o644); err != nil {
+	badPath := filepath.Join(dir, "bad.plist")
+	if err := os.WriteFile(badPath, []byte("not xml"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
-	// Malformed XML is silently skipped (warning to stderr).
-	jobs, err := job.List(dir)
+	jobs, warnings, err := job.List(dir)
 	if err != nil {
 		t.Fatalf("List: %v", err)
 	}
 	if len(jobs) != 0 {
 		t.Errorf("expected 0 jobs for malformed plist, got %d", len(jobs))
+	}
+	if len(warnings) != 1 {
+		t.Fatalf("expected 1 warning, got %d", len(warnings))
+	}
+	if warnings[0].Path != badPath {
+		t.Errorf("warning path: got %q, want %q", warnings[0].Path, badPath)
+	}
+	if warnings[0].Err == nil {
+		t.Error("expected non-nil error in warning")
 	}
 }
 
