@@ -50,6 +50,16 @@ func runRun(_ *cobra.Command, args []string) error {
 		return fmt.Errorf("ジョブが見つかりません: %s", id)
 	}
 
+	// Ensure the log directory exists before kickstarting so the process can
+	// write its output immediately on launch (mirrors the order in runAdd).
+	var logD string
+	if j.Managed {
+		logD, err = logDir()
+		if err != nil {
+			return fmt.Errorf("ログディレクトリの取得に失敗: %w", err)
+		}
+	}
+
 	lc, err := launchctl.New()
 	if err != nil {
 		return fmt.Errorf("launchctlクライアントの初期化に失敗: %w", err)
@@ -62,11 +72,6 @@ func runRun(_ *cobra.Command, args []string) error {
 	fmt.Printf("  ID:      %s\n", j.ID)
 	fmt.Printf("  コマンド: %s\n", strings.Join(j.Args, " "))
 	if j.Managed {
-		// Ensure the log directory exists so the process can write immediately.
-		logD, err := logDir()
-		if err != nil {
-			return fmt.Errorf("ログディレクトリの取得に失敗: %w", err)
-		}
 		fmt.Printf("  ログ:    %s/%s.log\n", logD, j.ID)
 		fmt.Printf("\nログをリアルタイムで確認:\n  tail -f %s/%s.log\n", logD, j.ID)
 	}
