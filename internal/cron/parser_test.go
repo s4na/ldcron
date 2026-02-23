@@ -6,14 +6,12 @@ import (
 	"github.com/s4na/ldcron/internal/cron"
 )
 
-func intPtr(v int) *int { return &v }
-
 func TestParseSchedule_Valid(t *testing.T) {
 	tests := []struct {
 		name    string
 		expr    string
-		wantLen int
 		check   func(t *testing.T, entries []cron.CalendarEntry)
+		wantLen int
 	}{
 		{
 			name:    "fixed hour and minute",
@@ -156,8 +154,8 @@ func TestParseSchedule_Valid(t *testing.T) {
 func TestParseSchedule_Macros(t *testing.T) {
 	tests := []struct {
 		macro   string
-		wantLen int
 		check   func(t *testing.T, entries []cron.CalendarEntry)
+		wantLen int
 	}{
 		{
 			macro:   "@hourly",
@@ -185,11 +183,11 @@ func TestParseSchedule_Macros(t *testing.T) {
 				}
 			},
 		},
-		{"@midnight", 1, nil},
-		{"@weekly", 1, nil},
-		{"@monthly", 1, nil},
-		{"@yearly", 1, nil},
-		{"@annually", 1, nil},
+		{macro: "@midnight", wantLen: 1},
+		{macro: "@weekly", wantLen: 1},
+		{macro: "@monthly", wantLen: 1},
+		{macro: "@yearly", wantLen: 1},
+		{macro: "@annually", wantLen: 1},
 	}
 
 	for _, tt := range tests {

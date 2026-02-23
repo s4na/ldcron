@@ -10,10 +10,10 @@ import (
 
 // Client executes launchctl commands in the gui/<uid> domain.
 type Client struct {
-	// Domain is e.g. "gui/501". Set by New().
-	Domain string
 	// run is the underlying command executor (swappable in tests).
 	run func(name string, args ...string) error
+	// Domain is e.g. "gui/501". Set by New().
+	Domain string
 }
 
 // New returns a Client configured for the current user's gui domain.

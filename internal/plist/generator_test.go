@@ -90,7 +90,7 @@ func TestReadSchedule_RoundTrip(t *testing.T) {
 
 	tmp := t.TempDir()
 	path := filepath.Join(tmp, j.Label+".plist")
-	if err := os.WriteFile(path, data, 0o644); err != nil {
+	if err = os.WriteFile(path, data, 0o644); err != nil {
 		t.Fatalf("WriteFile: %v", err)
 	}
 
