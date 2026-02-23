@@ -42,7 +42,7 @@ func init() {
 			defaultHelp(cmd, args)
 			return
 		}
-		fmt.Fprint(cmd.OutOrStdout(), rootHelpText())
+		_, _ = fmt.Fprint(cmd.OutOrStdout(), rootHelpText())
 	})
 }
 
