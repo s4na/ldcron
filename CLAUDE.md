@@ -3,21 +3,32 @@
 ## バージョン管理
 
 - バージョンは `cmd/root.go` の `version` 変数で管理する
-- **patch バージョンは `main` へのマージ時に CI（`auto-release.yml`）が自動でインクリメントする**
-- Claude が手動でバージョンを変更する必要はない
+- **patch バージョンは自動でインクリメントされる。手動で変更する必要はない**
+
+### 自動 patch バンプの仕組み（GHA）
+
+`main` ブランチへのマージ後、CI ワークフローが成功すると `.github/workflows/auto-release.yml` が自動実行される。
+
+1. CI（`.github/workflows/ci.yml`）が `main` ブランチで成功
+2. `auto-release.yml` がトリガー（`workflow_run` イベント）
+3. `cmd/root.go` の `version` の patch 番号をインクリメント
+4. `chore: bump version to vX.Y.Z [skip ci]` としてコミット・push
+5. `vX.Y.Z` タグを作成・push → `release.yml` がバイナリビルド・リリースを実行
+
+ボット自身のコミットによる二重発火は `actor.login != 'github-actions[bot]'` 条件で防止している。
 
 ### 手動バージョン変更が必要なケース
 
 - **minor** (`x.Y.0`): 後方互換性のある新機能追加
 - **major** (`X.0.0`): 破壊的変更（CLI インターフェース変更、設定形式変更など）
 
-上記の場合のみ `cmd/root.go` の `version` を直接編集する。その場合、CI による自動 patch バンプはその次のマージから再開される。
+上記の場合のみ `cmd/root.go` の `version` を直接編集する。次の PR マージ後、自動 patch バンプが再開される。
 
 ### バージョン定義場所
 
 ```go
 // cmd/root.go
-var version = "0.1.5"
+var version = "x.y.z"  // 現在のバージョン（CI が自動更新）
 ```
 
 `rootCmd` には `Version: version` を設定すること（`--version` フラグが自動追加される）。
