@@ -85,7 +85,7 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           # タグ checkout によるデタッチド HEAD から main ブランチへ切り替える
           git fetch origin main
-          git checkout main
+          git switch main
 
           # トップレベルの on_arm do / on_intel do ブロック（2スペースインデント）のみを対象とする
           # def install 内のネストされたブロック（4スペースインデント）は変更しない
@@ -97,6 +97,18 @@ jobs:
           # [skip ci] により auto-release.yml の二重発火を防ぐ
           # （actor チェックでも防止されるが明示的に付与する）
           git commit -m "chore: update Homebrew formula to ${TAG} [skip ci]"
-          # auto-release.yml の patch バンプと競合する可能性があるためリベースしてから push する
-          git pull --rebase origin main
-          git push origin main
+          # auto-release.yml の patch バンプと競合する可能性があるため、
+          # pull --rebase して push し、失敗した場合は最大3回リトライする
+          PUSHED=false
+          for i in 1 2 3; do
+            if git pull --rebase origin main && git push origin main; then
+              PUSHED=true
+              break
+            fi
+            echo "Push failed (attempt ${i}/3), retrying in 5s..."
+            sleep 5
+          done
+          if [[ "${PUSHED}" != "true" ]]; then
+            echo "ERROR: Failed to push after 3 attempts" >&2
+            exit 1
+          fi
