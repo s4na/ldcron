@@ -35,10 +35,10 @@ func runList(_ *cobra.Command, _ []string) error {
 	}
 
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(w, "ID\tSCHEDULE\tCOMMAND")
-	fmt.Fprintln(w, "--------\t---------\t-------")
+	_, _ = fmt.Fprintln(w, "ID\tSCHEDULE\tCOMMAND")
+	_, _ = fmt.Fprintln(w, "--------\t---------\t-------")
 	for _, j := range jobs {
-		fmt.Fprintf(w, "%s\t%s\t%s\n", j.ID, j.Schedule, strings.Join(j.Args, " "))
+		_, _ = fmt.Fprintf(w, "%s\t%s\t%s\n", j.ID, j.Schedule, strings.Join(j.Args, " "))
 	}
 	return w.Flush()
 }

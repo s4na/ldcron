@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"encoding/xml"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -167,6 +168,9 @@ func parseScheduleFromXML(data []byte) (string, []string, error) {
 	for {
 		tok, err := dec.Token()
 		if err != nil {
+			if err != io.EOF {
+				return "", nil, fmt.Errorf("XMLのデコードに失敗: %w", err)
+			}
 			break
 		}
 		switch t := tok.(type) {

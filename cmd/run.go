@@ -58,10 +58,15 @@ func runRun(_ *cobra.Command, args []string) error {
 		return fmt.Errorf("ジョブの実行に失敗: %w", err)
 	}
 
+	logD, err := logDir()
+	if err != nil {
+		return fmt.Errorf("ログディレクトリの取得に失敗: %w", err)
+	}
+
 	fmt.Printf("ジョブをバックグラウンドで起動しました\n")
 	fmt.Printf("  ID:      %s\n", j.ID)
 	fmt.Printf("  コマンド: %s\n", strings.Join(j.Args, " "))
-	fmt.Printf("  ログ:    ~/Library/Logs/ldcron/%s.log\n", j.ID)
-	fmt.Printf("\nログをリアルタイムで確認:\n  tail -f ~/Library/Logs/ldcron/%s.log\n", j.ID)
+	fmt.Printf("  ログ:    %s/%s.log\n", logD, j.ID)
+	fmt.Printf("\nログをリアルタイムで確認:\n  tail -f %s/%s.log\n", logD, j.ID)
 	return nil
 }

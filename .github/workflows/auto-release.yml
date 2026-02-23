@@ -1,0 +1,41 @@
+name: Auto Release
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  auto-release:
+    name: Bump version and release
+    runs-on: ubuntu-latest
+    if: github.actor != 'github-actions[bot]'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Bump patch version
+        id: bump
+        run: |
+          CURRENT=$(grep 'var version' cmd/root.go | sed 's/.*"\(.*\)".*/\1/')
+          IFS='.' read -r major minor patch <<< "$CURRENT"
+          NEW="${major}.${minor}.$((patch + 1))"
+          sed -i "s/var version = \"${CURRENT}\"/var version = \"${NEW}\"/" cmd/root.go
+          echo "version=${NEW}" >> "$GITHUB_OUTPUT"
+
+      - name: Commit, tag, and push
+        run: |
+          git add cmd/root.go
+          git commit -m "chore: bump version to v${{ steps.bump.outputs.version }} [skip ci]"
+          git tag "v${{ steps.bump.outputs.version }}"
+          git push origin main
+          git push origin "v${{ steps.bump.outputs.version }}"
