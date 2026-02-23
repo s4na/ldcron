@@ -128,7 +128,6 @@ func parsePlistInfoFromXML(data []byte) (label, schedule string, args []string, 
 	return
 }
 
-
 // --- XML document model (hand-rolled to match Apple plist DTD) ---
 
 type plistDoc struct {
@@ -219,7 +218,6 @@ func buildCalendarItems(entries []cron.CalendarEntry) []xmlNode {
 	return items
 }
 
-
 func decodeStringArray(dec *xml.Decoder, _ xml.StartElement) []string {
 	var result []string
 	for {
@@ -243,4 +241,3 @@ func decodeStringArray(dec *xml.Decoder, _ xml.StartElement) []string {
 	}
 	return result
 }
-

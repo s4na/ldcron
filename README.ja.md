@@ -114,7 +114,7 @@ ldcron list
 
 ```
 ID                        SCHEDULE        COMMAND
---------                  --------------- ----------------------------------
+----------------          --------------- ----------------------------------
 a1b2c3d4e5f6a7b8          0 12 * * *      /usr/local/bin/backup.sh
 e5f6a7b8a1b2c3d4          */5 * * * *     /usr/bin/ruby /path/to/worker.rb
 com.apple.ccachefixer     -               /usr/libexec/ccachefixer
