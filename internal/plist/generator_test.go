@@ -185,27 +185,3 @@ func TestReadPlistInfo_ProgramKeyFallback(t *testing.T) {
 	}
 }
 
-func TestReadSchedule_RoundTrip(t *testing.T) {
-	j := job.NewJob("30 9 * * 1-5", []string{"/usr/bin/ruby", "/path/to/script.rb"})
-	data, err := plist.Generate(j.Label, j.Schedule, j.Args, "/tmp/logs")
-	if err != nil {
-		t.Fatalf("Generate: %v", err)
-	}
-
-	tmp := t.TempDir()
-	path := filepath.Join(tmp, j.Label+".plist")
-	if err = os.WriteFile(path, data, 0o644); err != nil {
-		t.Fatalf("WriteFile: %v", err)
-	}
-
-	schedule, args, err := plist.ReadSchedule(path)
-	if err != nil {
-		t.Fatalf("ReadSchedule: %v", err)
-	}
-	if schedule != "30 9 * * 1-5" {
-		t.Errorf("schedule: got %q, want %q", schedule, "30 9 * * 1-5")
-	}
-	if len(args) != 2 || args[0] != "/usr/bin/ruby" || args[1] != "/path/to/script.rb" {
-		t.Errorf("args: got %v", args)
-	}
-}

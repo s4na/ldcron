@@ -80,6 +80,7 @@ func fromPlist(path string) (*Job, error) {
 	if managed {
 		id = strings.TrimPrefix(base, "com.ldcron.")
 		if id == "" {
+			// safety net: unreachable unless filename is "com.ldcron..plist"
 			id = label
 		}
 	} else {

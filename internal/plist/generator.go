@@ -59,15 +59,6 @@ func Write(dir, label, schedule string, args []string, logDir string) (string, e
 	return path, nil
 }
 
-// ReadSchedule extracts the schedule and ProgramArguments from a plist file.
-func ReadSchedule(path string) (schedule string, args []string, err error) {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return "", nil, err
-	}
-	return parseScheduleFromXML(data)
-}
-
 // ReadPlistInfo reads Label, X-Ldcron-Schedule (optional), and ProgramArguments
 // from any launchd plist file. If X-Ldcron-Schedule is absent, schedule is
 // returned as an empty string without error. If Label is absent in the plist,
@@ -77,7 +68,10 @@ func ReadPlistInfo(path string) (label, schedule string, args []string, err erro
 	if err != nil {
 		return "", "", nil, err
 	}
-	label, schedule, args = parsePlistInfoFromXML(data)
+	label, schedule, args, err = parsePlistInfoFromXML(data)
+	if err != nil {
+		return "", "", nil, err
+	}
 	if label == "" {
 		base := filepath.Base(path)
 		label = strings.TrimSuffix(base, ".plist")
@@ -89,13 +83,16 @@ func ReadPlistInfo(path string) (label, schedule string, args []string, err erro
 // ProgramArguments from raw plist XML without requiring X-Ldcron-Schedule to
 // be present. If ProgramArguments is absent but Program is set, args is
 // returned as []string{program} to support both launchd plist variants.
-func parsePlistInfoFromXML(data []byte) (label, schedule string, args []string) {
+func parsePlistInfoFromXML(data []byte) (label, schedule string, args []string, err error) {
 	dec := xml.NewDecoder(bytes.NewReader(data))
 	var lastKey string
 	var program string
 	for {
-		tok, err := dec.Token()
-		if err != nil {
+		tok, xmlErr := dec.Token()
+		if xmlErr != nil {
+			if xmlErr != io.EOF {
+				err = fmt.Errorf("XMLのデコードに失敗: %w", xmlErr)
+			}
 			break
 		}
 		switch t := tok.(type) {
@@ -130,6 +127,7 @@ func parsePlistInfoFromXML(data []byte) (label, schedule string, args []string) 
 	}
 	return
 }
+
 
 // --- XML document model (hand-rolled to match Apple plist DTD) ---
 
@@ -221,49 +219,6 @@ func buildCalendarItems(entries []cron.CalendarEntry) []xmlNode {
 	return items
 }
 
-// parseScheduleFromXML reads X-Ldcron-Schedule and ProgramArguments from raw XML.
-func parseScheduleFromXML(data []byte) (string, []string, error) {
-	dec := xml.NewDecoder(bytes.NewReader(data))
-	var schedule string
-	var args []string
-	var lastKey string
-
-	for {
-		tok, err := dec.Token()
-		if err != nil {
-			if err != io.EOF {
-				return "", nil, fmt.Errorf("XMLのデコードに失敗: %w", err)
-			}
-			break
-		}
-		switch t := tok.(type) {
-		case xml.StartElement:
-			switch t.Name.Local {
-			case "key":
-				var s string
-				if e := dec.DecodeElement(&s, &t); e == nil {
-					lastKey = s
-				}
-			case "string":
-				var s string
-				if e := dec.DecodeElement(&s, &t); e == nil {
-					if lastKey == scheduleKey {
-						schedule = s
-					}
-				}
-			case "array":
-				if lastKey == "ProgramArguments" {
-					args = decodeStringArray(dec, t)
-				}
-			}
-		}
-	}
-
-	if schedule == "" {
-		return "", nil, fmt.Errorf("%s キーが見つかりません", scheduleKey)
-	}
-	return schedule, args, nil
-}
 
 func decodeStringArray(dec *xml.Decoder, _ xml.StartElement) []string {
 	var result []string
