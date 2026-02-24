@@ -51,6 +51,15 @@ func validateInlineScript(script string) error {
 		if ch == '\x00' {
 			return fmt.Errorf("inline script contains a null byte at position %d; null characters are not allowed", i)
 		}
+		// XML 1.0 also forbids U+0001–U+0008, U+000B–U+000C, and U+000E–U+001F.
+		// Go's xml encoder silently replaces these with U+FFFD (replacement
+		// character), which would corrupt the stored script without any error.
+		// Tab (U+0009), newline (U+000A), and carriage return (U+000D) are
+		// the only control characters permitted by XML 1.0.
+		if (ch >= '\x01' && ch <= '\x08') || ch == '\x0B' || ch == '\x0C' || (ch >= '\x0E' && ch <= '\x1F') {
+			return fmt.Errorf("inline script contains a forbidden control character (U+%04X) at position %d; "+
+				"XML 1.0 only permits tab (U+0009), newline (U+000A), and carriage return (U+000D) as control characters", ch, i)
+		}
 	}
 	return nil
 }
