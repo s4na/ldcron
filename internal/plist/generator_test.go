@@ -185,3 +185,163 @@ func TestReadPlistInfo_ProgramKeyFallback(t *testing.T) {
 	}
 }
 
+// --- Multi-line command tests ---
+
+// writeAndReadArgs is a helper that generates a plist with the given args,
+// writes it to a temp file, reads it back, and returns the recovered args.
+func writeAndReadArgs(t *testing.T, args []string) []string {
+	t.Helper()
+	j := job.NewJob("0 * * * *", args)
+	data, err := plist.Generate(j.Label, j.Schedule, args, "/tmp/logs")
+	if err != nil {
+		t.Fatalf("Generate: %v", err)
+	}
+	tmp := t.TempDir()
+	path := filepath.Join(tmp, j.Label+".plist")
+	if writeErr := os.WriteFile(path, data, 0o644); writeErr != nil {
+		t.Fatalf("WriteFile: %v", writeErr)
+	}
+	_, _, gotArgs, err := plist.ReadPlistInfo(path)
+	if err != nil {
+		t.Fatalf("ReadPlistInfo: %v", err)
+	}
+	return gotArgs
+}
+
+func TestGenerate_MultilineArgRoundTrip(t *testing.T) {
+	// The primary use case: /bin/sh -c with a multi-line script.
+	script := "cd /tmp\necho hello\ndate >> log.txt\necho world"
+	args := []string{"/bin/sh", "-c", script}
+
+	gotArgs := writeAndReadArgs(t, args)
+
+	if len(gotArgs) != 3 {
+		t.Fatalf("args length: got %d, want 3; args=%q", len(gotArgs), gotArgs)
+	}
+	if gotArgs[2] != script {
+		t.Errorf("script arg mismatch:\ngot:  %q\nwant: %q", gotArgs[2], script)
+	}
+}
+
+func TestGenerate_MultilineArgWithBlankLines(t *testing.T) {
+	// Blank lines within the script must also survive the round-trip.
+	script := "echo start\n\necho middle\n\necho end"
+	args := []string{"/bin/sh", "-c", script}
+
+	gotArgs := writeAndReadArgs(t, args)
+
+	if len(gotArgs) != 3 || gotArgs[2] != script {
+		t.Errorf("script with blank lines mismatch:\ngot:  %q\nwant: %q", gotArgs[2], script)
+	}
+}
+
+func TestGenerate_XMLSpecialCharsInArgs(t *testing.T) {
+	// Args containing XML special characters must be escaped and restored
+	// correctly.
+	tests := []struct {
+		name string
+		arg  string
+	}{
+		{"ampersand", "echo a & b"},
+		{"less_than", "if [ $x < 10 ]; then echo ok; fi"},
+		{"greater_than", "echo result > /tmp/out.txt"},
+		{"double_quote", `echo "hello world"`},
+		{"combined", `echo "a < b" && echo "c > d" & echo "e & f"`},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			args := []string{"/bin/sh", "-c", tc.arg}
+			gotArgs := writeAndReadArgs(t, args)
+			if len(gotArgs) != 3 || gotArgs[2] != tc.arg {
+				t.Errorf("arg mismatch:\ngot:  %q\nwant: %q", gotArgs[2], tc.arg)
+			}
+		})
+	}
+}
+
+func TestGenerate_TabInArgs(t *testing.T) {
+	// Literal tab characters in args should survive the round-trip.
+	script := "echo\thello\tworld"
+	args := []string{"/bin/sh", "-c", script}
+
+	gotArgs := writeAndReadArgs(t, args)
+
+	if len(gotArgs) != 3 || gotArgs[2] != script {
+		t.Errorf("tab arg mismatch:\ngot:  %q\nwant: %q", gotArgs[2], script)
+	}
+}
+
+func TestGenerate_UnicodeInArgs(t *testing.T) {
+	// Unicode characters (including multi-byte sequences) must be preserved.
+	script := "echo '日本語テスト' && echo '🎉'"
+	args := []string{"/bin/sh", "-c", script}
+
+	gotArgs := writeAndReadArgs(t, args)
+
+	if len(gotArgs) != 3 || gotArgs[2] != script {
+		t.Errorf("unicode arg mismatch:\ngot:  %q\nwant: %q", gotArgs[2], script)
+	}
+}
+
+func TestGenerate_BackslashInArgs(t *testing.T) {
+	// Backslashes in shell scripts (escape sequences, paths) must be preserved.
+	script := `echo "line1\nline2" && ls /usr/local/bin`
+	args := []string{"/bin/sh", "-c", script}
+
+	gotArgs := writeAndReadArgs(t, args)
+
+	if len(gotArgs) != 3 || gotArgs[2] != script {
+		t.Errorf("backslash arg mismatch:\ngot:  %q\nwant: %q", gotArgs[2], script)
+	}
+}
+
+func TestReadPlistInfo_CRLFPreserved(t *testing.T) {
+	// Although the XML 1.0 specification requires parsers to normalize \r\n
+	// to \n, Go's encoding/xml decoder does NOT perform this normalization.
+	// As a result, \r\n inside a <string> element is round-tripped unchanged.
+	// This test documents the actual behaviour so callers are not surprised.
+	scriptCRLF := "echo hello\r\ndate"
+
+	args := []string{"/bin/sh", "-c", scriptCRLF}
+	j := job.NewJob("0 * * * *", args)
+	data, err := plist.Generate(j.Label, j.Schedule, args, "/tmp/logs")
+	if err != nil {
+		t.Fatalf("Generate: %v", err)
+	}
+
+	tmp := t.TempDir()
+	path := filepath.Join(tmp, j.Label+".plist")
+	if writeErr := os.WriteFile(path, data, 0o644); writeErr != nil {
+		t.Fatalf("WriteFile: %v", writeErr)
+	}
+
+	_, _, gotArgs, err := plist.ReadPlistInfo(path)
+	if err != nil {
+		t.Fatalf("ReadPlistInfo: %v", err)
+	}
+
+	// Go's xml decoder preserves \r\n as-is (no normalization).
+	if len(gotArgs) != 3 || gotArgs[2] != scriptCRLF {
+		t.Errorf("CRLF round-trip: got %q, want %q", gotArgs[2], scriptCRLF)
+	}
+}
+
+func TestGenerate_SingleArgScript(t *testing.T) {
+	// After inline-script wrapping, ProgramArguments is [/bin/sh, -c, script].
+	// Verify a realistic wrapped multi-line script survives the round-trip.
+	script := "set -e\ncd /var/log\nfind . -name '*.log' -mtime +30 -delete\necho cleaned"
+	args := []string{"/bin/sh", "-c", script}
+
+	gotArgs := writeAndReadArgs(t, args)
+
+	if !strings.EqualFold(gotArgs[0], "/bin/sh") {
+		t.Errorf("args[0]: got %q, want /bin/sh", gotArgs[0])
+	}
+	if gotArgs[1] != "-c" {
+		t.Errorf("args[1]: got %q, want -c", gotArgs[1])
+	}
+	if gotArgs[2] != script {
+		t.Errorf("script round-trip mismatch:\ngot:  %q\nwant: %q", gotArgs[2], script)
+	}
+}
+
