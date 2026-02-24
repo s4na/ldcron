@@ -334,7 +334,7 @@ func TestGenerate_SingleArgScript(t *testing.T) {
 
 	gotArgs := writeAndReadArgs(t, args)
 
-	if !strings.EqualFold(gotArgs[0], "/bin/sh") {
+	if gotArgs[0] != "/bin/sh" {
 		t.Errorf("args[0]: got %q, want /bin/sh", gotArgs[0])
 	}
 	if gotArgs[1] != "-c" {
@@ -342,6 +342,34 @@ func TestGenerate_SingleArgScript(t *testing.T) {
 	}
 	if gotArgs[2] != script {
 		t.Errorf("script round-trip mismatch:\ngot:  %q\nwant: %q", gotArgs[2], script)
+	}
+}
+
+func TestReadPlistInfo_CROnlyPreserved(t *testing.T) {
+	// \r (CR only, without LF) also survives the round-trip unchanged in
+	// Go's encoding/xml decoder. This test documents that behaviour.
+	scriptCR := "echo hello\rdate"
+
+	args := []string{"/bin/sh", "-c", scriptCR}
+	j := job.NewJob("0 * * * *", args)
+	data, err := plist.Generate(j.Label, j.Schedule, args, "/tmp/logs")
+	if err != nil {
+		t.Fatalf("Generate: %v", err)
+	}
+
+	tmp := t.TempDir()
+	path := filepath.Join(tmp, j.Label+".plist")
+	if writeErr := os.WriteFile(path, data, 0o644); writeErr != nil {
+		t.Fatalf("WriteFile: %v", writeErr)
+	}
+
+	_, _, gotArgs, err := plist.ReadPlistInfo(path)
+	if err != nil {
+		t.Fatalf("ReadPlistInfo: %v", err)
+	}
+
+	if len(gotArgs) != 3 || gotArgs[2] != scriptCR {
+		t.Errorf("CR-only round-trip: got %q, want %q", gotArgs[2], scriptCR)
 	}
 }
 

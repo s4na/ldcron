@@ -69,7 +69,7 @@ func runAdd(cmd *cobra.Command, args []string) error {
 				"tip: to run a shell script inline, pass it as a single argument:\n"+
 				"  ldcron add %q 'cmd1 && cmd2'", command, schedule)
 		}
-		script := programArgs[0]
+		script := command
 		if err := validateInlineScript(script); err != nil {
 			return err
 		}

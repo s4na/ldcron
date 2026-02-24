@@ -76,13 +76,18 @@ ldcron remove a1b2c3d4
 ### `add` — Register a job
 
 ```
-ldcron add <schedule> <command> [args...]
+ldcron add <schedule> <command|script> [args...]
 ```
 
 Parses the cron expression, generates a launchd plist, and loads the agent. A short ID derived from the schedule and command is assigned to the job.
 
+The command can be specified in two ways:
+
+- **Absolute path** — pass the binary path and optional arguments directly.
+- **Inline shell script** — pass a single unquoted argument. ldcron wraps it in `/bin/sh -c "..."` automatically. Multi-line scripts are supported via `$'...'` quoting.
+
 ```bash
-# Every day at 12:00
+# Every day at 12:00 (absolute path)
 ldcron add "0 12 * * *" /usr/local/bin/backup.sh
 
 # Every 5 minutes with arguments
@@ -90,6 +95,12 @@ ldcron add "*/5 * * * *" /usr/bin/ruby /path/to/worker.rb --verbose
 
 # Weekdays 9–17, on the hour
 ldcron add "0 9-17 * * 1-5" /usr/local/bin/sync.sh
+
+# Inline single-line shell command
+ldcron add "0 * * * *" "echo hello && date >> /tmp/log.txt"
+
+# Inline multi-line shell script ($'...' enables \n as actual newline)
+ldcron add "0 * * * *" $'cd /tmp\nfind . -name "*.log" -mtime +30 -delete\necho cleaned'
 ```
 
 ```
@@ -241,8 +252,8 @@ tail -n 100 ~/Library/Logs/ldcron/a1b2c3d4.log
 
 ## Caveats
 
-- **Absolute paths only.** launchd does not run commands in a login shell, so `$PATH` is not expanded. Use `which <command>` to find the full path.
-- **No shell wrapper.** Shell built-ins and pipes require an explicit interpreter: `ldcron add "* * * * *" /bin/sh -c 'echo hello >> /tmp/out.txt'`
+- **Absolute paths only (for multi-argument commands).** launchd does not run commands in a login shell, so `$PATH` is not expanded. Use `which <command>` to find the full path, or pass an inline script (see `add` above) to let ldcron wrap it in `/bin/sh -c`.
+- **Shell built-ins and pipes** require an explicit shell. Use an absolute path with `/bin/sh -c '...'`, or pass a single inline script argument.
 - **`run` is asynchronous.** ldcron does not wait for the job to finish. Check the log for results.
 - **`run --force` kills running processes.** Without `--force`, starting an already-running job returns an error. `--force` terminates the running instance immediately before restarting. Use with care.
 - **Step expressions use absolute clock times.** `*/5 * * * *` fires at minutes :00, :05, :10 … regardless of when the job was registered — not 5 minutes after the last run.
@@ -259,7 +270,7 @@ Job IDs changed from 8 to 16 characters in v0.1.3. Existing jobs continue to run
 The exact same schedule and command are already tracked. Run `ldcron list` to inspect existing jobs; use `ldcron remove` if you want to re-register.
 
 **`command must be an absolute path`**
-Relative paths and shell aliases are not supported. Run `which <command>` to obtain the full path.
+When passing multiple arguments, the first must be an absolute path. Run `which <command>` to obtain the full path. Alternatively, pass a single inline shell script: `ldcron add "..." 'cmd1 && cmd2'`.
 
 **`invalid cron expression`**
 A field value is out of range or the expression has fewer than 5 fields. Check the [syntax reference](#cron-expression-syntax) above.
