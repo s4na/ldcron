@@ -84,3 +84,12 @@ launchd との互換性を損なう変更（plist 形式の変更、独自キー
 - Go の標準スタイルに従う（`gofmt`、`golangci-lint` 通過必須）
 - テストは変更に合わせて追加・修正する
 - `internal/` パッケージ間の循環インポートを避ける
+
+## コミット前の lint チェック
+
+**commit する前に必ず `golangci-lint run` を実行し、lint が通った状態でコミットする。**
+
+1. `golangci-lint run` を実行
+2. エラーがあれば修正
+3. 再度 `golangci-lint run` を実行してエラーがないことを確認
+4. lint が通ってから `git commit`
