@@ -1,17 +1,17 @@
 class Ldcron < Formula
   desc "cron形式でlaunchdジョブを管理するmacOS CLIツール"
   homepage "https://github.com/s4na/ldcron"
-  version "0.1.19"
+  version "0.1.20"
   license "MIT"
 
   on_arm do
     url "https://github.com/s4na/ldcron/releases/download/v#{version}/ldcron-darwin-arm64.tar.gz"
-    sha256 "b8175c6a633be212d979cbfe71296ca4f7bd3e4addaec91d339c9fef70c9c6d6"
+    sha256 "41361e090ab9eea0879461b37e13fbe4be65c9411576059568c5ce2a7efeeb40"
   end
 
   on_intel do
     url "https://github.com/s4na/ldcron/releases/download/v#{version}/ldcron-darwin-amd64.tar.gz"
-    sha256 "cc977fb910c27423bfe7ccf69424674475b869b17e6497a479e40bc676208c9a"
+    sha256 "c3b75722d912df85e1ef854d77259aa34d6f8c902ac60af0a8d0b62f7696a4c9"
   end
 
   def install
