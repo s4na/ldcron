@@ -78,11 +78,12 @@ func runAdd(cmd *cobra.Command, args []string) error {
 				"tip: to run a shell script inline, pass it as a single argument:\n"+
 				"  ldcron add %q 'cmd1 && cmd2'", command, schedule)
 		}
-		script := command
+		script := programArgs[0]
 		if err := validateInlineScript(script); err != nil {
 			return err
 		}
 		programArgs = []string{"/bin/sh", "-c", script}
+		// /bin/sh is a protected system binary guaranteed to exist on macOS 12+.
 		command = "/bin/sh"
 	}
 

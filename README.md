@@ -84,7 +84,7 @@ Parses the cron expression, generates a launchd plist, and loads the agent. A sh
 The command can be specified in two ways:
 
 - **Absolute path** — pass the binary path and optional arguments directly.
-- **Inline shell script** — pass a single unquoted argument. ldcron wraps it in `/bin/sh -c "..."` automatically. Multi-line scripts are supported via `$'...'` quoting.
+- **Inline shell script** — pass the script as a single argument. ldcron wraps it in `/bin/sh -c "..."` automatically. Multi-line scripts are supported via `$'...'` quoting.
 
 ```bash
 # Every day at 12:00 (absolute path)
@@ -254,6 +254,7 @@ tail -n 100 ~/Library/Logs/ldcron/a1b2c3d4.log
 
 - **Absolute paths only (for multi-argument commands).** launchd does not run commands in a login shell, so `$PATH` is not expanded. Use `which <command>` to find the full path, or pass an inline script (see `add` above) to let ldcron wrap it in `/bin/sh -c`.
 - **Shell built-ins and pipes** require an explicit shell. Use an absolute path with `/bin/sh -c '...'`, or pass a single inline script argument.
+- **Inline scripts use Unix line endings (LF).** If your script contains Windows-style line endings (CRLF), the CR characters are stored as-is in the plist and passed to `/bin/sh`. Most shells handle this silently, but if a script behaves unexpectedly, convert line endings to LF before passing it (e.g. `tr -d '\r'`).
 - **`run` is asynchronous.** ldcron does not wait for the job to finish. Check the log for results.
 - **`run --force` kills running processes.** Without `--force`, starting an already-running job returns an error. `--force` terminates the running instance immediately before restarting. Use with care.
 - **Step expressions use absolute clock times.** `*/5 * * * *` fires at minutes :00, :05, :10 … regardless of when the job was registered — not 5 minutes after the last run.
