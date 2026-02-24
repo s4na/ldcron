@@ -167,33 +167,33 @@ func TestRunAdd_RelativePathWithMultipleArgs(t *testing.T) {
 	// This check happens before any filesystem or launchd interaction.
 	tests := []struct {
 		name     string
-		args     []string
 		wantPart string
+		args     []string
 	}{
 		{
-			"relative_plus_one_arg",
-			[]string{"0 * * * *", "myscript.sh", "arg1"},
-			"must be an absolute path",
+			name:     "relative_plus_one_arg",
+			args:     []string{"0 * * * *", "myscript.sh", "arg1"},
+			wantPart: "must be an absolute path",
 		},
 		{
-			"relative_plus_multiple_args",
-			[]string{"0 * * * *", "script", "a", "b", "c"},
-			"tip:",
+			name:     "relative_plus_multiple_args",
+			args:     []string{"0 * * * *", "script", "a", "b", "c"},
+			wantPart: "tip:",
 		},
 		{
-			"dotslash_plus_arg",
-			[]string{"0 * * * *", "./run.sh", "--flag"},
-			"must be an absolute path",
+			name:     "dotslash_plus_arg",
+			args:     []string{"0 * * * *", "./run.sh", "--flag"},
+			wantPart: "must be an absolute path",
 		},
 		{
-			"dotdotslash_plus_arg",
-			[]string{"0 * * * *", "../sibling.sh", "arg"},
-			"must be an absolute path",
+			name:     "dotdotslash_plus_arg",
+			args:     []string{"0 * * * *", "../sibling.sh", "arg"},
+			wantPart: "must be an absolute path",
 		},
 		{
-			"tilde_path_plus_arg",
-			[]string{"0 * * * *", "~/bin/script.sh", "arg"},
-			"must be an absolute path",
+			name:     "tilde_path_plus_arg",
+			args:     []string{"0 * * * *", "~/bin/script.sh", "arg"},
+			wantPart: "must be an absolute path",
 		},
 	}
 	for _, tc := range tests {

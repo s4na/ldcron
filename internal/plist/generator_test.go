@@ -420,7 +420,7 @@ func TestGenerate_VeryLongScript(t *testing.T) {
 	// A large script (many lines, 5000+ bytes) must survive the round-trip.
 	var sb strings.Builder
 	for i := 0; i < 100; i++ {
-		sb.WriteString(fmt.Sprintf("echo 'step %04d: processing item %04d && cleanup > /tmp/log.txt'\n", i, i*100))
+		fmt.Fprintf(&sb, "echo 'step %04d: processing item %04d && cleanup > /tmp/log.txt'\n", i, i*100)
 	}
 	script := sb.String()
 	args := []string{"/bin/sh", "-c", script}
