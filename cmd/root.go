@@ -8,7 +8,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var version = "0.1.20"
+var version = "0.1.21"
 
 var rootCmd = &cobra.Command{
 	Use:          "ldcron",
