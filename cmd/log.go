@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"fmt"
-	"os"
 	"path/filepath"
 
 	"github.com/spf13/cobra"
@@ -40,16 +39,17 @@ func init() {
 }
 
 func runLogSetupRotation(cmd *cobra.Command, _ []string) error {
-	home, err := os.UserHomeDir()
+	dir, err := logDirPath()
 	if err != nil {
-		return fmt.Errorf("failed to get home directory: %w", err)
+		return err
 	}
-	logPattern := filepath.Join(home, "Library", "Logs", "ldcron", "*.log")
+	logPattern := filepath.Join(dir, "*.log")
 
 	w := cmd.OutOrStdout()
 	_, _ = fmt.Fprintf(w, "# ldcron log rotation — managed by ldcron\n")
 	_, _ = fmt.Fprintf(w, "# See newsyslog.conf(5) for format details.\n")
 	_, _ = fmt.Fprintf(w, "# logfilename\t\t\t\t\t\tmode\tcount\tsize\twhen\tflags\n")
+	// Flags: G=glob pattern, N=no signal to any process, B=no rotation message in log
 	_, _ = fmt.Fprintf(w, "%s\t644\t3\t1024\t*\tGNB\n", logPattern)
 	return nil
 }

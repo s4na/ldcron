@@ -18,6 +18,7 @@ func TestLogSetupRotation(t *testing.T) {
 	var buf bytes.Buffer
 	cmd := logSetupRotationCmd
 	cmd.SetOut(&buf)
+	t.Cleanup(func() { cmd.SetOut(nil) })
 
 	if err := cmd.RunE(cmd, nil); err != nil {
 		t.Fatalf("unexpected error: %v", err)
