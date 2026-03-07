@@ -239,6 +239,22 @@ tail -f ~/Library/Logs/ldcron/a1b2c3d4.log
 tail -n 100 ~/Library/Logs/ldcron/a1b2c3d4.log
 ```
 
+### Log rotation
+
+Log files grow indefinitely by default. ldcron provides a command to generate
+a newsyslog(8) configuration that automatically rotates all ldcron log files.
+
+```bash
+# Generate and install the newsyslog config (one-time setup, requires sudo)
+ldcron log setup-rotation | sudo tee /etc/newsyslog.d/com.ldcron.conf
+```
+
+The generated configuration rotates each log file when it exceeds 1 MB,
+keeps 3 compressed (gzip) archives, and requires no process signaling
+(launchd reopens log files on each job execution). newsyslog runs
+automatically every hour via a system launchd job, so no additional
+scheduling is needed.
+
 ---
 
 ## File locations

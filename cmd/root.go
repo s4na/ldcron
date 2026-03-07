@@ -34,6 +34,7 @@ func init() {
 	rootCmd.AddCommand(listCmd)
 	rootCmd.AddCommand(removeCmd)
 	rootCmd.AddCommand(runCmd)
+	rootCmd.AddCommand(logCmd)
 
 	// Save the default subcommand help, then set a custom help for the root command.
 	defaultHelp := rootCmd.HelpFunc()
@@ -76,6 +77,7 @@ Commands:
   list                                     List all registered jobs
   remove  <id>                             Delete a job by ID
   run     <id>                             Run a job immediately
+  log     setup-rotation                   Print newsyslog config for log rotation
 
 Cron expression format (minute hour day month weekday):
 
@@ -83,6 +85,10 @@ Cron expression format (minute hour day month weekday):
   "*/5 * * * *"    Every 5 minutes at fixed times (:00, :05, :10 ...)
   "0 9 * * 1-5"    Weekdays (Mon–Fri) at 9:00
   "30 8 1 * *"     1st of every month at 8:30
+
+Log rotation:
+
+  ldcron log setup-rotation | sudo tee /etc/newsyslog.d/com.ldcron.conf
 
 Flags:
 
