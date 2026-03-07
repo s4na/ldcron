@@ -49,7 +49,8 @@ func runLogSetupRotation(cmd *cobra.Command, _ []string) error {
 	_, _ = fmt.Fprintf(w, "# ldcron log rotation — managed by ldcron\n")
 	_, _ = fmt.Fprintf(w, "# See newsyslog.conf(5) for format details.\n")
 	_, _ = fmt.Fprintf(w, "# logfilename\t\t\t\t\t\tmode\tcount\tsize\twhen\tflags\n")
-	// Flags: G=glob pattern, N=no signal to any process, B=no rotation message in log
+	// Flags: G=glob pattern, N=no signal to any process,
+	// B=don't insert a rotation-marker line into the new log file
 	_, _ = fmt.Fprintf(w, "%s\t644\t3\t1024\t*\tGNB\n", logPattern)
 	return nil
 }

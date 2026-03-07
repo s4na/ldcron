@@ -241,7 +241,7 @@ tail -n 100 ~/Library/Logs/ldcron/a1b2c3d4.log
 
 ### ログローテーション
 
-ログファイルはデフォルトでは無限に増え続けます。ldcronは[newsyslog(8)](x-man-page://newsyslog)の設定を生成するコマンドを提供しており、すべてのldcronログファイルを自動的にローテーションできます。
+ログファイルはデフォルトでは無限に増え続けます。ldcronはnewsyslog(8)の設定を生成するコマンドを提供しており、すべてのldcronログファイルを自動的にローテーションできます。
 
 ```bash
 # newsyslog設定を生成・インストール（初回のみ、sudo必要）

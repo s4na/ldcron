@@ -35,4 +35,7 @@ func TestLogSetupRotation(t *testing.T) {
 	if !strings.Contains(output, "1024") {
 		t.Errorf("output should contain size 1024, got:\n%s", output)
 	}
+	if !strings.Contains(output, "644") {
+		t.Errorf("output should contain mode 644, got:\n%s", output)
+	}
 }
