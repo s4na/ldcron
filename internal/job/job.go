@@ -13,6 +13,8 @@ type Job struct {
 	ID string
 	// Label is the launchd service label.
 	Label string
+	// Path is the plist file path this job was loaded from.
+	Path string
 	// Schedule is the original cron expression (empty for external jobs without X-Ldcron-Schedule).
 	Schedule string
 	// Args is [command, arg1, arg2, ...].
