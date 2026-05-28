@@ -316,10 +316,12 @@ golangci-lint run
 Patch releases are automated after changes land on `main`:
 
 1. A push to `main` starts the [Auto Release workflow](.github/workflows/auto-release.yml).
-2. Auto Release verifies the module, builds the project, runs tests, and runs `go vet`.
+2. Auto Release verifies the module, builds the project, runs tests, runs `go vet`, runs lint, and confirms the release binaries can be built.
 3. If verification passes, Auto Release increments the patch version in `cmd/root.go`.
 4. Auto Release commits the version bump with `[skip ci]`, creates and pushes a `vX.Y.Z` tag, then starts the [Release workflow](.github/workflows/release.yml) with `gh workflow run release.yml --ref vX.Y.Z`.
 5. The Release workflow builds the macOS arm64 and amd64 archives, creates the GitHub release, and updates the Homebrew formula checksums.
+
+The Release workflow only accepts tag refs whose names match `vX.Y.Z`; branch refs and non-release tags fail before artifacts are published.
 
 Do not edit the patch version manually for ordinary fixes. Edit `cmd/root.go` only when preparing a minor or major version bump.
 
