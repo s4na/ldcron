@@ -7,15 +7,16 @@
 
 ### 自動 patch バンプの仕組み（GHA）
 
-`main` ブランチへのマージ後、CI ワークフローが成功すると `.github/workflows/auto-release.yml` が自動実行される。
+`main` ブランチへのマージ後、`.github/workflows/auto-release.yml` が検証を実行し、成功すると patch バージョンを自動でインクリメントする。
 
-1. CI（`.github/workflows/ci.yml`）が `main` ブランチで成功
-2. `auto-release.yml` がトリガー（`workflow_run` イベント）
-3. `cmd/root.go` の `version` の patch 番号をインクリメント
+1. `main` ブランチへの push で `auto-release.yml` が起動
+2. `auto-release.yml` の `verify` job が依存関係検証・ビルド・テスト・vet・lint・リリース用ビルドを実行
+3. 検証成功後、`cmd/root.go` の `version` の patch 番号をインクリメント
 4. `chore: bump version to vX.Y.Z [skip ci]` としてコミット・push
-5. `vX.Y.Z` タグを作成・push → `release.yml` がバイナリビルド・リリースを実行
+5. `vX.Y.Z` タグを作成・push
+6. `gh workflow run release.yml --ref vX.Y.Z` で `release.yml` を起動し、バイナリビルド・リリースを実行
 
-ボット自身のコミットによる二重発火は `actor.login != 'github-actions[bot]'` 条件で防止している。
+ボット自身のコミットによる二重発火は `github.actor_id != '41898282'` 条件で防止している（`41898282` は `github-actions[bot]`）。
 
 ### 手動バージョン変更が必要なケース
 
