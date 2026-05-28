@@ -306,6 +306,18 @@ go test -race ./...
 golangci-lint run
 ```
 
+### リリース手順
+
+patchリリースは、変更が`main`に入った後に自動で実行されます。
+
+1. `main`へのpushで[Auto Release workflow](.github/workflows/auto-release.yml)が起動します。
+2. Auto Releaseがモジュール検証、ビルド、テスト、`go vet`を実行します。
+3. 検証に成功すると、Auto Releaseが`cmd/root.go`のpatchバージョンをインクリメントします。
+4. Auto Releaseが`[skip ci]`付きでバージョン更新をcommitし、`vX.Y.Z`タグを作成・pushしてから、`gh workflow run release.yml --ref vX.Y.Z`で[Release workflow](.github/workflows/release.yml)を起動します。
+5. Release workflowがmacOS arm64/amd64向けアーカイブをビルドし、GitHub Releaseを作成し、Homebrew formulaのchecksumを更新します。
+
+通常の修正ではpatchバージョンを手動で編集しないでください。minorまたはmajorバージョンを準備する場合のみ、`cmd/root.go`を編集します。
+
 ---
 
 ## ライセンス
