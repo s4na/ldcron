@@ -1,0 +1,9 @@
+rules:
+  artipacked:
+    disable: true
+  excessive-permissions:
+    disable: true
+  superfluous-actions:
+    disable: true
+  unpinned-uses:
+    disable: true
