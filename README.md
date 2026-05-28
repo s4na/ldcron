@@ -5,35 +5,33 @@
 [![Go](https://img.shields.io/badge/go-1.25%2B-blue)](go.mod)
 [![macOS](https://img.shields.io/badge/macOS-12%2B-lightgrey)](https://github.com/s4na/ldcron)
 
-**Schedule macOS launchd jobs using familiar cron syntax.**
+**cron式でmacOSのlaunchdジョブを管理するCLIツール。**
 
-[日本語 README](README.ja.md)
+ldcronは、使い慣れたcron記法とmacOSの`launchd`エージェントシステムをつなぐ、シンプルなCLIです。plistファイルを一切書かずに、ジョブの登録・削除・一覧・実行が行えます。
 
-ldcron is a minimal CLI that bridges the gap between the cron expressions you already know and the `launchd` agent system on macOS — without ever touching a plist file.
-
-ldcron is **fully compatible with native launchd**:
-- Jobs registered through ldcron are standard launchd plist files. If you stop using ldcron, all jobs continue running exactly as before — no dependency on the ldcron binary at runtime.
-- `ldcron list`, `ldcron remove`, and `ldcron run` work on **any** plist in `~/Library/LaunchAgents/`, not just the ones ldcron created. You can use ldcron to manage your existing launchd agents.
+ldcronは**ネイティブのlaunchdと完全互換**です：
+- ldcronで登録したジョブは、標準のlaunchd plistファイルとして保存されます。ldcronを使わなくなっても、登録済みのジョブはそのまま動作し続けます。実行時にldcronバイナリへの依存はありません。
+- `ldcron list`・`ldcron remove`・`ldcron run`は、ldcronで作成したジョブだけでなく、`~/Library/LaunchAgents/`にある**すべてのplist**を操作できます。既存のlaunchdエージェントもldcronで管理できます。
 
 ---
 
-## Why ldcron?
+## なぜldcronか？
 
-macOS replaced `cron` with `launchd` as the recommended job scheduler. But launchd requires verbose XML plist files, a specific directory layout, and manual `launchctl` invocations — a significant overhead just to run a script on a schedule.
+macOSは推奨ジョブスケジューラとして`cron`を`launchd`に置き換えました。しかしlaunchdを使うには、冗長なXML plistファイル、特定のディレクトリ配置、手動での`launchctl`実行が必要で、スクリプトをスケジュール実行するだけの作業にしては手間がかかります。
 
-ldcron handles all of that for you. You write a cron expression; ldcron writes the plist, loads the agent, and manages the job lifecycle.
+ldcronはその手間をすべて肩代わりします。cron式を渡せば、ldcronがplistの生成・エージェントの読み込み・ジョブのライフサイクル管理をすべて行います。
 
 ```bash
-# Before ldcron — write XML, copy it to ~/Library/LaunchAgents/, then run launchctl load …
-# After ldcron:
+# ldcron導入前 — XMLを書いて ~/Library/LaunchAgents/ に置いて launchctl load して…
+# ldcron導入後:
 ldcron add "0 12 * * *" /usr/local/bin/backup.sh
 ```
 
 ---
 
-## Installation
+## インストール
 
-### Homebrew (recommended)
+### Homebrew（推奨）
 
 ```bash
 brew tap s4na/ldcron https://github.com/s4na/ldcron
@@ -46,82 +44,82 @@ brew install ldcron
 go install github.com/s4na/ldcron@latest
 ```
 
-**Requirements:** macOS 12 (Monterey) or later.
+**動作要件:** macOS 12 (Monterey) 以降
 
 ---
 
-## Quick start
+## クイックスタート
 
 ```bash
-# Schedule a script to run every day at noon
+# 毎日12時にスクリプトをスケジュール
 ldcron add "0 12 * * *" /usr/local/bin/backup.sh
 
-# List all scheduled jobs
+# 登録済みジョブを一覧表示
 ldcron list
 
-# Trigger a job immediately (useful for testing)
+# ジョブを即時実行（動作確認に）
 ldcron run a1b2c3d4
 
-# Watch the output in real time
+# ログをリアルタイムで確認
 tail -f ~/Library/Logs/ldcron/a1b2c3d4.log
 
-# Remove a job when you no longer need it
+# ジョブを削除
 ldcron remove a1b2c3d4
 ```
 
 ---
 
-## Commands
+## コマンドリファレンス
 
-### `add` — Register a job
+### `add` — ジョブを登録する
 
 ```
 ldcron add <schedule> <command|script> [args...]
 ```
 
-Parses the cron expression, generates a launchd plist, and loads the agent. A short ID derived from the schedule and command is assigned to the job.
+cron式を解析してlaunchd plistを生成し、エージェントを読み込みます。スケジュールとコマンドから生成した短いIDがジョブに割り当てられます。
 
-The command can be specified in two ways:
+コマンドは2つの方法で指定できます：
 
-- **Absolute path** — pass the binary path and optional arguments directly.
-- **Inline shell script** — pass the script as a single argument. ldcron wraps it in `/bin/sh -c "..."` automatically. Multi-line scripts are supported via `$'...'` quoting.
+- **絶対パス** — バイナリのフルパスと任意の引数を直接渡します。
+- **インラインシェルスクリプト** — 引数を1つだけ渡します。ldcron が自動的に `/bin/sh -c "..."` でラップします。`$'...'` 記法を使うと複数行スクリプトも指定できます。
 
 ```bash
-# Every day at 12:00 (absolute path)
+# 毎日12:00に実行（絶対パス）
 ldcron add "0 12 * * *" /usr/local/bin/backup.sh
 
-# Every 5 minutes with arguments
+# 5分ごとに引数付きで実行
 ldcron add "*/5 * * * *" /usr/bin/ruby /path/to/worker.rb --verbose
 
-# Weekdays 9–17, on the hour
+# 平日の9〜17時に毎時実行
 ldcron add "0 9-17 * * 1-5" /usr/local/bin/sync.sh
 
-# Inline single-line shell command
+# インライン1行シェルコマンド
 ldcron add "0 * * * *" "echo hello && date >> /tmp/log.txt"
 
-# Inline multi-line shell script ($'...' enables \n as actual newline)
+# インライン複数行シェルスクリプト（$'...' で \n が実際の改行になる）
 ldcron add "0 * * * *" $'cd /tmp\nfind . -name "*.log" -mtime +30 -delete\necho cleaned'
 ```
 
 ```
-Job added
+ジョブを追加しました
   ID:       a1b2c3d4
-  Schedule: 0 12 * * *
-  Command:  /usr/local/bin/backup.sh
-  Log:      ~/Library/Logs/ldcron/a1b2c3d4.log
+  スケジュール: 0 12 * * *
+  コマンド:   /usr/local/bin/backup.sh
+  ログ:      ~/Library/Logs/ldcron/a1b2c3d4.log
 ```
 
-> **Note:** Duplicate registrations (same schedule + command) are prevented. The same inputs always produce the same ID.
+> **補足:** 同一のスケジュール＋コマンドの重複登録は防止されます。同じ入力からは常に同じIDが生成されます。
 
 ---
 
-### `list` — List registered jobs
+### `list` — 登録済みジョブを一覧表示する
 
 ```
 ldcron list
 ```
 
-Lists **all** plist files in `~/Library/LaunchAgents/`, including jobs not created by ldcron. For external jobs, the full launchd label is shown as the ID and the schedule column shows `-` if no cron expression is stored.
+`~/Library/LaunchAgents/`にある**すべての**plistを表示します（ldcron以外で作成したジョブも含む）。外部ジョブはlaunchdラベル全体がIDとして表示され、cron式が保存されていない場合はスケジュール欄に`-`が表示されます。
 
 ```
 ID                        SCHEDULE        COMMAND
@@ -133,13 +131,13 @@ com.apple.ccachefixer     -               /usr/libexec/ccachefixer
 
 ---
 
-### `remove` — Unregister a job
+### `remove` — ジョブを削除する
 
 ```
 ldcron remove <id>
 ```
 
-Unloads the launchd agent and deletes the corresponding plist file. For ldcron-managed jobs use the short hex ID; for external jobs use the full launchd label.
+launchdエージェントをアンロードし、対応するplistファイルを削除します。ldcron管理ジョブは短いhex IDで、外部ジョブはlaunchdラベル全体で指定します。
 
 ```bash
 ldcron remove a1b2c3d4e5f6a7b8
@@ -147,172 +145,181 @@ ldcron remove com.apple.ccachefixer
 ```
 
 ```
-Job removed
+ジョブを削除しました
   ID:       a1b2c3d4
-  Schedule: 0 12 * * *
-  Command:  /usr/local/bin/backup.sh
+  スケジュール: 0 12 * * *
+  コマンド:   /usr/local/bin/backup.sh
 ```
 
 ---
 
-### `run` — Run a job immediately
+### `run` — ジョブを即時実行する
 
 ```
 ldcron run [--force] <id>
 ```
 
-Triggers the job via `launchctl kickstart`. Execution is asynchronous. For ldcron-managed jobs, the log path is printed; for external jobs, consult the plist's own `StandardOutPath` configuration.
+`launchctl kickstart`でジョブをトリガーします。実行は非同期です。ldcron管理ジョブはログパスが表示されます。外部ジョブのログはそのplistの`StandardOutPath`設定を参照してください。
 
 ```bash
 ldcron run a1b2c3d4e5f6a7b8
 tail -f ~/Library/Logs/ldcron/a1b2c3d4e5f6a7b8.log
 
-# Run an external job immediately
+# 外部ジョブを即時実行する
 ldcron run com.apple.ccachefixer
 
-# Force restart even if the job is currently running
+# 実行中のインスタンスを強制終了して再起動する場合
 ldcron run --force a1b2c3d4e5f6a7b8
 ```
 
 ```
-Job started in background
+ジョブをバックグラウンドで起動しました
   ID:      a1b2c3d4
-  Command: /usr/local/bin/backup.sh
-  Log:     ~/Library/Logs/ldcron/a1b2c3d4.log
+  コマンド: /usr/local/bin/backup.sh
+  ログ:    ~/Library/Logs/ldcron/a1b2c3d4.log
 ```
 
-> **Note:** Without `--force`, running a job that is already executing will return an error. `--force` kills the running instance before restarting — use it only when you intend to interrupt an in-progress run.
+> **補足:** `--force`なしでは、すでに実行中のジョブはエラーを返します。`--force`は実行中のインスタンスを強制終了してから再起動します。実行中のジョブを中断してよい場合のみ使用してください。
 
 ---
 
-## Cron expression syntax
+## cron式の構文
 
-ldcron uses the standard 5-field cron format:
+5フィールド（**分 時 日 月 曜日**）の標準形式を使用します。
 
 ```
-┌──────────── minute       (0–59)
-│ ┌────────── hour         (0–23)
-│ │ ┌──────── day of month (1–31)
-│ │ │ ┌────── month        (1–12)
-│ │ │ │ ┌──── day of week  (0=Sun … 6=Sat, 7=Sun)
+┌──────────── 分 (0–59)
+│ ┌────────── 時 (0–23)
+│ │ ┌──────── 日 (1–31)
+│ │ │ ┌────── 月 (1–12)
+│ │ │ │ ┌──── 曜日 (0=日 … 6=土, 7=日)
 │ │ │ │ │
 * * * * *
 ```
 
-| Syntax          | Example               | Description                        |
-|-----------------|-----------------------|------------------------------------|
-| `*`             | `* * * * *`           | Every minute                       |
-| Fixed value     | `0 12 * * *`          | Every day at 12:00                 |
-| Step            | `*/15 * * * *`        | Every 15 minutes                   |
-| Range           | `0 9-17 * * *`        | Top of each hour from 9:00–17:00   |
-| List            | `0 9,12,18 * * *`     | At 9:00, 12:00, and 18:00          |
-| Range with step | `0-30/10 * * * *`     | Minutes 0, 10, 20, 30              |
-| Day of week     | `0 9 * * 1-5`         | Weekdays at 9:00                   |
-| `@hourly`       | `@hourly`             | Equivalent to `0 * * * *`         |
-| `@daily`        | `@daily`              | Equivalent to `0 0 * * *`         |
-| `@weekly`       | `@weekly`             | Equivalent to `0 0 * * 0`         |
-| `@monthly`      | `@monthly`            | Equivalent to `0 0 1 * *`         |
-| `@yearly`       | `@yearly`             | Equivalent to `0 0 1 1 *`         |
+| 構文           | 例                    | 説明                             |
+|----------------|-----------------------|----------------------------------|
+| `*`            | `* * * * *`           | 毎分                             |
+| 固定値         | `0 12 * * *`          | 毎日12:00                        |
+| ステップ       | `*/15 * * * *`        | 15分ごと                         |
+| 範囲           | `0 9-17 * * *`        | 9〜17時の毎時0分                 |
+| リスト         | `0 9,12,18 * * *`     | 9時・12時・18時                  |
+| 範囲＋ステップ  | `0-30/10 * * * *`     | 0・10・20・30分                  |
+| 曜日指定       | `0 9 * * 1-5`         | 月〜金の9:00                     |
+| `@hourly`      | `@hourly`             | `0 * * * *` と同じ              |
+| `@daily`       | `@daily`              | `0 0 * * *` と同じ              |
+| `@weekly`      | `@weekly`             | `0 0 * * 0` と同じ              |
+| `@monthly`     | `@monthly`            | `0 0 1 * *` と同じ              |
+| `@yearly`      | `@yearly`             | `0 0 1 1 *` と同じ              |
 
-### Common patterns
+### よく使うパターン
 
 ```bash
-"* * * * *"        # every minute
-"*/5 * * * *"      # every 5 minutes (at :00, :05, :10 … not relative to start time)
-"0 0 * * *"        # daily at midnight
-"@daily"           # same as above
-"0 9 * * 1-5"      # weekdays at 9:00
-"30 8 1 * *"       # 1st of every month at 8:30
+"* * * * *"        # 毎分
+"*/5 * * * *"      # 5分ごと（:00, :05, :10 … という絶対時刻でトリガー）
+"0 0 * * *"        # 毎日深夜0時
+"@daily"           # 上と同じ
+"0 9 * * 1-5"      # 平日の9:00
+"30 8 1 * *"       # 毎月1日の8:30
 ```
 
 ---
 
-## Logs
+## ログの確認
 
-stdout and stderr for each job are written to `~/Library/Logs/ldcron/<id>.log`.
+各ジョブのstdoutとstderrは `~/Library/Logs/ldcron/<id>.log` に記録されます。
 
 ```bash
-# Stream logs in real time
+# リアルタイムで確認
 tail -f ~/Library/Logs/ldcron/a1b2c3d4.log
 
-# View the last 100 lines
+# 最後の100行を表示
 tail -n 100 ~/Library/Logs/ldcron/a1b2c3d4.log
 ```
 
-### Log rotation
+### ログローテーション
 
-Log files grow indefinitely by default. ldcron provides a command to generate
-a newsyslog(8) configuration that automatically rotates all ldcron log files.
+ログファイルはデフォルトでは無限に増え続けます。ldcronはnewsyslog(8)の設定を生成するコマンドを提供しており、すべてのldcronログファイルを自動的にローテーションできます。
 
 ```bash
-# Generate and install the newsyslog config (one-time setup, requires sudo)
+# newsyslog設定を生成・インストール（初回のみ、sudo必要）
 ldcron log setup-rotation | sudo tee /etc/newsyslog.d/com.ldcron.conf
 ```
 
-The generated configuration rotates each log file when it exceeds 1 MB,
-keeps 3 compressed (gzip) archives, and requires no process signaling
-(launchd reopens log files on each job execution). newsyslog runs
-automatically every hour via a system launchd job, so no additional
-scheduling is needed.
+生成される設定は、各ログファイルが1MBを超えた時点でローテーションし、gzip圧縮したアーカイブを3世代保持します。プロセスへのシグナル送信は不要です（launchdはジョブ実行ごとにログファイルを開き直すため）。newsyslogはシステムのlaunchdジョブにより毎時自動実行されるため、追加のスケジュール設定は不要です。
 
 ---
 
-## File locations
+## ファイル配置
 
-| Artifact      | Path                                              |
+| 種別          | パス                                              |
 |---------------|---------------------------------------------------|
 | launchd plist | `~/Library/LaunchAgents/com.ldcron.<id>.plist`    |
-| Job log       | `~/Library/Logs/ldcron/<id>.log`                  |
+| ジョブログ    | `~/Library/Logs/ldcron/<id>.log`                  |
 
 ---
 
-## Caveats
+## 注意事項
 
-- **Absolute paths only (for multi-argument commands).** launchd does not run commands in a login shell, so `$PATH` is not expanded. Use `which <command>` to find the full path, or pass an inline script (see `add` above) to let ldcron wrap it in `/bin/sh -c`.
-- **Shell built-ins and pipes** require an explicit shell. Use an absolute path with `/bin/sh -c '...'`, or pass a single inline script argument.
-- **Inline scripts use Unix line endings (LF).** If your script contains Windows-style line endings (CRLF), the CR characters are stored as-is in the plist and passed to `/bin/sh`. Most shells handle this silently, but if a script behaves unexpectedly, convert line endings to LF before passing it (e.g. `tr -d '\r'`).
-- **`run` is asynchronous.** ldcron does not wait for the job to finish. Check the log for results.
-- **`run --force` kills running processes.** Without `--force`, starting an already-running job returns an error. `--force` terminates the running instance immediately before restarting. Use with care.
-- **Step expressions use absolute clock times.** `*/5 * * * *` fires at minutes :00, :05, :10 … regardless of when the job was registered — not 5 minutes after the last run.
-- **Login session only.** Jobs are loaded into the `gui/<uid>` launchd domain and run only while you are logged in. They are not suitable for system-level or headless tasks.
-
----
-
-## Troubleshooting
-
-**Upgrading from v0.1.2 or earlier**
-Job IDs changed from 8 to 16 characters in v0.1.3. Existing jobs continue to run, but re-registering the same schedule and command will create a new entry instead of detecting the duplicate. Run `ldcron list` to find old 8-character IDs and `ldcron remove <old-id>` to unload them before re-adding.
-
-**`already registered`**
-The exact same schedule and command are already tracked. Run `ldcron list` to inspect existing jobs; use `ldcron remove` if you want to re-register.
-
-**`command must be an absolute path`**
-When passing multiple arguments, the first must be an absolute path. Run `which <command>` to obtain the full path. Alternatively, pass a single inline shell script: `ldcron add "..." 'cmd1 && cmd2'`.
-
-**`invalid cron expression`**
-A field value is out of range or the expression has fewer than 5 fields. Check the [syntax reference](#cron-expression-syntax) above.
+- **複数引数コマンドは絶対パスが必須。** launchdはログインシェルを経由しないため`$PATH`が展開されません。`which <コマンド名>`でフルパスを確認してください。あるいはインラインスクリプト（上記 `add` 参照）を使うと ldcron が `/bin/sh -c` でラップします。
+- **シェル組み込みコマンドやパイプ** を使う場合はシェルを明示してください。絶対パスで `/bin/sh -c '...'` と書くか、1引数のインラインスクリプトとして渡してください。
+- **インラインスクリプトの改行は LF（Unix形式）を使用してください。** Windows形式の改行（CRLF）が含まれる場合、CR文字がそのまま plist に保存され `/bin/sh` に渡されます。多くのシェルは問題なく処理しますが、予期しない動作が起きた場合は改行を LF に変換してから渡してください（例: `tr -d '\r'`）。
+- **`run`は非同期。** ジョブの完了を待ちません。結果はログで確認してください。
+- **`run --force`は実行中プロセスを強制終了します。** `--force`なしでは、実行中のジョブはエラーを返します。`--force`は実行中のインスタンスを即座に終了してから再起動します。
+- **ステップ式は絶対時刻でトリガーされます。** `*/5 * * * *`は登録時刻から5分後ではなく、:00, :05, :10 …という絶対的な分数でトリガーされます。
+- **ログインセッション限定。** ジョブは`gui/<uid>`ドメインに読み込まれ、ログイン中のみ実行されます。システムレベルや常駐タスクには適していません。
 
 ---
 
-## Contributing
+## トラブルシューティング
 
-Contributions are welcome. Please open an issue before submitting a significant pull request so we can align on the direction.
+**v0.1.2以前からのアップグレード**
+v0.1.3でジョブIDが8文字から16文字に変更されました。既存のジョブはそのまま動作し続けますが、同じスケジュール＋コマンドを再登録すると重複として検出されず新しいエントリが作成されます。`ldcron list`で古い8文字のIDを確認し、`ldcron remove <古いID>`でアンロードしてから再登録してください。
+
+**`already registered`（すでに登録済みです）**
+同一のスケジュール＋コマンドがすでに登録されています。`ldcron list`で既存ジョブを確認し、必要であれば`ldcron remove`で削除してから再登録してください。
+
+**`command must be an absolute path`（コマンドは絶対パスで指定してください）**
+複数引数を渡す場合、最初の引数は絶対パスでなければなりません。`which <コマンド名>`でフルパスを確認してください。または1つのインラインスクリプトとして渡す方法もあります：`ldcron add "..." 'cmd1 && cmd2'`
+
+**`invalid cron expression`（cron式が無効）**
+フィールドの値が範囲外か、5フィールド未満です。[cron式の構文](#cron式の構文)を確認してください。
+
+---
+
+## コントリビューション
+
+コントリビューションを歓迎します。大きな変更を送る前に、まずIssueを開いて方向性を確認してください。
 
 ```bash
-# Clone and build
+# クローンしてビルド
 git clone https://github.com/s4na/ldcron.git
 cd ldcron
 go build ./...
 
-# Run tests (requires macOS)
+# テスト実行（macOS必須）
 go test -race ./...
 
 # Lint
 golangci-lint run
 ```
 
+### リリース手順
+
+patchリリースは、変更が`main`に入った後に自動で実行されます。
+
+1. `main`へのpushで[Auto Release workflow](.github/workflows/auto-release.yml)が起動します。
+2. Auto Releaseがモジュール検証、ビルド、テスト、`go vet`、lint、リリース用バイナリのビルド確認を実行します。
+3. 検証に成功すると、Auto Releaseが`cmd/root.go`のpatchバージョンをインクリメントします。
+4. Auto Releaseが`[skip ci]`付きでバージョン更新をcommitし、`vX.Y.Z`タグを作成・pushしてから、`gh workflow run release.yml --ref vX.Y.Z`で[Release workflow](.github/workflows/release.yml)を起動します。
+5. Release workflowがmacOS arm64/amd64向けアーカイブをビルドし、GitHub Releaseを作成し、Homebrew formulaのchecksumを更新します。
+
+Release workflowは、`vX.Y.Z`に一致するタグrefだけを受け付けます。ブランチrefやリリース用でないタグは、成果物を公開する前に失敗します。
+
+通常の修正ではpatchバージョンを手動で編集しないでください。minorまたはmajorバージョンを準備する場合のみ、`cmd/root.go`を編集します。
+
 ---
 
-## License
+## ライセンス
 
 MIT © [s4na](https://github.com/s4na)
