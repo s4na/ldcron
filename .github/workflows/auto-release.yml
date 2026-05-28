@@ -1,28 +1,42 @@
 name: Auto Release
 
 on:
-  workflow_run:
-    workflows: ["CI"]
-    types: [completed]
+  push:
     branches: [main]
 
 permissions:
+  actions: write
   contents: write
 
 jobs:
   auto-release:
     name: Bump version and release
     runs-on: ubuntu-latest
-    # Only run when CI passes and the triggering actor is not the bot itself
-    # (the bot's version-bump commit also fires CI; skip that second invocation).
-    if: >
-      github.event.workflow_run.conclusion == 'success' &&
-      github.event.workflow_run.actor.login != 'github-actions[bot]'
+    # The bot's version-bump commit also pushes to main; skip that invocation.
+    if: github.actor_id != '41898282'
     steps:
       - uses: actions/checkout@v6
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: false
+
+      - name: Verify dependencies
+        run: go mod verify
+
+      - name: Build
+        run: go build -v ./...
+
+      - name: Run tests
+        run: go test -v -race -count=1 ./...
+
+      - name: Vet
+        run: go vet ./...
 
       - name: Configure git
         run: |
@@ -39,9 +53,13 @@ jobs:
           echo "version=${NEW}" >> "$GITHUB_OUTPUT"
 
       - name: Commit, tag, and push
+        env:
+          VERSION: ${{ steps.bump.outputs.version }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           git add cmd/root.go
-          git commit -m "chore: bump version to v${{ steps.bump.outputs.version }} [skip ci]"
-          git tag "v${{ steps.bump.outputs.version }}"
+          git commit -m "chore: bump version to v${VERSION} [skip ci]"
+          git tag "v${VERSION}"
           git push origin main
-          git push origin "v${{ steps.bump.outputs.version }}"
+          git push origin "v${VERSION}"
+          gh workflow run release.yml --ref "v${VERSION}"

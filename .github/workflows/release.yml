@@ -4,11 +4,7 @@ on:
   push:
     tags:
       - 'v*'
-  # GITHUB_TOKEN で push されたタグはワークフローをトリガーしないため、
-  # auto-release.yml 完了後にも発火させる
-  workflow_run:
-    workflows: ["Auto Release"]
-    types: [completed]
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -17,9 +13,6 @@ jobs:
   release:
     name: Release
     runs-on: macos-latest
-    if: >
-      github.event_name == 'push' ||
-      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
     steps:
       - uses: actions/checkout@v6
         with:
@@ -27,33 +20,35 @@ jobs:
 
       - name: Determine version
         id: version
+        env:
+          REF_NAME: ${{ github.ref_name }}
         run: |
-          if [[ "${{ github.event_name }}" == "workflow_run" ]]; then
-            TAG=$(git describe --tags --abbrev=0)
-          else
-            TAG="${{ github.ref_name }}"
-          fi
+          TAG="${REF_NAME}"
           echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
 
       - name: Set up Go
         uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
-          cache: true
+          cache: false
 
       - name: Run tests
         run: go test -v -race -count=1 ./...
 
       - name: Build (arm64)
+        env:
+          VERSION_TAG: ${{ steps.version.outputs.tag }}
         run: |
-          GOARCH=arm64 GOOS=darwin go build -ldflags="-s -w -X github.com/s4na/ldcron/cmd.version=${{ steps.version.outputs.tag }}" \
+          GOARCH=arm64 GOOS=darwin go build -ldflags="-s -w -X github.com/s4na/ldcron/cmd.version=${VERSION_TAG}" \
             -o ldcron-darwin-arm64 .
           tar czf ldcron-darwin-arm64.tar.gz ldcron-darwin-arm64
           shasum -a 256 ldcron-darwin-arm64.tar.gz > ldcron-darwin-arm64.tar.gz.sha256
 
       - name: Build (amd64)
+        env:
+          VERSION_TAG: ${{ steps.version.outputs.tag }}
         run: |
-          GOARCH=amd64 GOOS=darwin go build -ldflags="-s -w -X github.com/s4na/ldcron/cmd.version=${{ steps.version.outputs.tag }}" \
+          GOARCH=amd64 GOOS=darwin go build -ldflags="-s -w -X github.com/s4na/ldcron/cmd.version=${VERSION_TAG}" \
             -o ldcron-darwin-amd64 .
           tar czf ldcron-darwin-amd64.tar.gz ldcron-darwin-amd64
           shasum -a 256 ldcron-darwin-amd64.tar.gz > ldcron-darwin-amd64.tar.gz.sha256
@@ -70,10 +65,12 @@ jobs:
           generate_release_notes: true
 
       - name: Update Homebrew formula
+        env:
+          VERSION_TAG: ${{ steps.version.outputs.tag }}
         run: |
           ARM64_SHA256=$(awk '{print $1}' ldcron-darwin-arm64.tar.gz.sha256)
           AMD64_SHA256=$(awk '{print $1}' ldcron-darwin-amd64.tar.gz.sha256)
-          TAG="${{ steps.version.outputs.tag }}"
+          TAG="${VERSION_TAG}"
           VERSION="${TAG#v}"
 
           if [[ -z "${ARM64_SHA256}" || -z "${AMD64_SHA256}" ]]; then
