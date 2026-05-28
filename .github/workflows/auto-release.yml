@@ -39,7 +39,7 @@ jobs:
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v9
         with:
-          version: latest
+          version: v2.12.2
 
       - name: Build release binary (arm64)
         run: GOARCH=arm64 GOOS=darwin go build -ldflags="-s -w" -o ldcron-darwin-arm64 .
