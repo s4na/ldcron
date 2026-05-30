@@ -13,13 +13,14 @@ type Job struct {
 	ID string
 	// Label is the launchd service label.
 	Label string
+	// Path is the plist file path this job was loaded from.
+	Path string
 	// Schedule is the original cron expression (empty for external jobs without X-Ldcron-Schedule).
 	Schedule string
 	// Args is [command, arg1, arg2, ...].
 	Args []string
 	// Managed is true for jobs created by ldcron (com.ldcron.* with X-Ldcron-Schedule).
-	Managed   bool
-	plistPath string
+	Managed bool
 }
 
 // NewJob creates a Job with a deterministic ID based on schedule and args.

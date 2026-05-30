@@ -272,7 +272,7 @@ func TestRemove_ExternalJobRenamesFile(t *testing.T) {
 	}
 }
 
-func TestRemove_ExternalJobRenamesActualFileWhenLabelDiffers(t *testing.T) {
+func TestRemove_ExternalJobUsesDiscoveredPlistPath(t *testing.T) {
 	dir := t.TempDir()
 	externalPlist := `<?xml version="1.0" encoding="UTF-8"?>
 <plist version="1.0"><dict>
@@ -305,10 +305,12 @@ func TestRemove_ExternalJobRenamesActualFileWhenLabelDiffers(t *testing.T) {
 	if _, err := os.Stat(plistPath); !os.IsNotExist(err) {
 		t.Error("original plist should have been renamed away")
 	}
-	if _, err := os.Stat(filepath.Join(dir, "com.example.actual-label.plist")); !os.IsNotExist(err) {
-		t.Error("remove should not create or depend on Label-derived plist path")
-	}
 	if _, err := os.Stat(backupPath); err != nil {
 		t.Errorf("backup file should exist: %v", err)
+	}
+
+	wrongPath := filepath.Join(dir, "com.example.actual-label.plist")
+	if _, err := os.Stat(wrongPath); !os.IsNotExist(err) {
+		t.Errorf("remove should not create or touch label-derived path %q", wrongPath)
 	}
 }
