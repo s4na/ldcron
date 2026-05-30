@@ -7,6 +7,22 @@ import (
 )
 
 func TestParseSchedule_Valid(t *testing.T) {
+	assertWeekdaysOnce := func(t *testing.T, entries []cron.CalendarEntry) {
+		t.Helper()
+		seen := map[int]int{}
+		for _, e := range entries {
+			if e.Weekday == nil {
+				t.Fatalf("Weekday should be set: %+v", e)
+			}
+			seen[*e.Weekday]++
+		}
+		for day := 0; day <= 6; day++ {
+			if seen[day] != 1 {
+				t.Errorf("weekday %d count: got %d, want 1", day, seen[day])
+			}
+		}
+	}
+
 	tests := []struct {
 		name    string
 		check   func(t *testing.T, entries []cron.CalendarEntry)
@@ -98,24 +114,16 @@ func TestParseSchedule_Valid(t *testing.T) {
 			expr:    "0 9 * * 0-7",
 			wantLen: 7,
 			check: func(t *testing.T, entries []cron.CalendarEntry) {
-				seen := map[int]int{}
-				for _, e := range entries {
-					if e.Weekday == nil {
-						t.Fatalf("Weekday should be set: %+v", e)
-					}
-					seen[*e.Weekday]++
-				}
-				for day := 0; day <= 6; day++ {
-					if seen[day] != 1 {
-						t.Errorf("weekday %d count: got %d, want 1", day, seen[day])
-					}
-				}
+				assertWeekdaysOnce(t, entries)
 			},
 		},
 		{
 			name:    "weekday step */1 deduplicates Sunday",
 			expr:    "0 9 * * */1",
 			wantLen: 7,
+			check: func(t *testing.T, entries []cron.CalendarEntry) {
+				assertWeekdaysOnce(t, entries)
+			},
 		},
 		{
 			name:    "cartesian product: hour and weekday",
