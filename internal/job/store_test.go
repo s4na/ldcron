@@ -296,6 +296,12 @@ func TestRemove_ExternalJobUsesDiscoveredPlistPath(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Remove: %v", err)
 	}
+	if backupPath == "" {
+		t.Fatal("expected non-empty backupPath for external job")
+	}
+	if !strings.HasPrefix(backupPath, plistPath+".backup_") {
+		t.Errorf("backup path: got %q, want prefix %q", backupPath, plistPath+".backup_")
+	}
 	if _, err := os.Stat(plistPath); !os.IsNotExist(err) {
 		t.Error("original plist should have been renamed away")
 	}

@@ -144,6 +144,13 @@ func expandField(s string, spec fieldSpec) ([]int, bool, error) {
 		allValues = append(allValues, vals...)
 	}
 
+	if spec.max == 7 {
+		for i, v := range allValues {
+			if v == 7 {
+				allValues[i] = 0
+			}
+		}
+	}
 	allValues = dedup(allValues)
 	sort.Ints(allValues)
 	return allValues, false, nil

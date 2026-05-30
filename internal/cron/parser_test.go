@@ -7,6 +7,22 @@ import (
 )
 
 func TestParseSchedule_Valid(t *testing.T) {
+	assertWeekdaysOnce := func(t *testing.T, entries []cron.CalendarEntry) {
+		t.Helper()
+		seen := map[int]int{}
+		for _, e := range entries {
+			if e.Weekday == nil {
+				t.Fatalf("Weekday should be set: %+v", e)
+			}
+			seen[*e.Weekday]++
+		}
+		for day := 0; day <= 6; day++ {
+			if seen[day] != 1 {
+				t.Errorf("weekday %d count: got %d, want 1", day, seen[day])
+			}
+		}
+	}
+
 	tests := []struct {
 		name    string
 		check   func(t *testing.T, entries []cron.CalendarEntry)
@@ -92,6 +108,22 @@ func TestParseSchedule_Valid(t *testing.T) {
 			name:    "weekday range 1-5 (Mon-Fri)",
 			expr:    "0 9 * * 1-5",
 			wantLen: 5,
+		},
+		{
+			name:    "weekday range 0-7 deduplicates Sunday",
+			expr:    "0 9 * * 0-7",
+			wantLen: 7,
+			check: func(t *testing.T, entries []cron.CalendarEntry) {
+				assertWeekdaysOnce(t, entries)
+			},
+		},
+		{
+			name:    "weekday step */1 deduplicates Sunday",
+			expr:    "0 9 * * */1",
+			wantLen: 7,
+			check: func(t *testing.T, entries []cron.CalendarEntry) {
+				assertWeekdaysOnce(t, entries)
+			},
 		},
 		{
 			name:    "cartesian product: hour and weekday",
@@ -208,8 +240,8 @@ func TestParseSchedule_Macros(t *testing.T) {
 
 func TestValidateSchedule(t *testing.T) {
 	tests := []struct {
-		expr     string
-		hasWarn  bool
+		expr    string
+		hasWarn bool
 	}{
 		{"0 0 31 2 *", true},  // Feb 31 does not exist
 		{"0 0 30 2 *", true},  // Feb 30 does not exist
