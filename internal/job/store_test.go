@@ -271,3 +271,44 @@ func TestRemove_ExternalJobRenamesFile(t *testing.T) {
 		t.Errorf("unexpected backup path format: %q", backupPath)
 	}
 }
+
+func TestRemove_ExternalJobRenamesActualFileWhenLabelDiffers(t *testing.T) {
+	dir := t.TempDir()
+	externalPlist := `<?xml version="1.0" encoding="UTF-8"?>
+<plist version="1.0"><dict>
+	<key>Label</key><string>com.example.actual-label</string>
+	<key>ProgramArguments</key><array><string>/usr/bin/foo</string></array>
+</dict></plist>`
+	plistPath := filepath.Join(dir, "different-filename.plist")
+	if err := os.WriteFile(plistPath, []byte(externalPlist), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	found, err := job.Find(dir, "com.example.actual-label")
+	if err != nil {
+		t.Fatalf("Find: %v", err)
+	}
+	if found == nil {
+		t.Fatal("job not found")
+	}
+
+	backupPath, err := job.Remove(dir, found)
+	if err != nil {
+		t.Fatalf("Remove: %v", err)
+	}
+	if backupPath == "" {
+		t.Fatal("expected non-empty backupPath for external job")
+	}
+	if !strings.HasPrefix(backupPath, plistPath+".backup_") {
+		t.Errorf("backup path: got %q, want prefix %q", backupPath, plistPath+".backup_")
+	}
+	if _, err := os.Stat(plistPath); !os.IsNotExist(err) {
+		t.Error("original plist should have been renamed away")
+	}
+	if _, err := os.Stat(filepath.Join(dir, "com.example.actual-label.plist")); !os.IsNotExist(err) {
+		t.Error("remove should not create or depend on Label-derived plist path")
+	}
+	if _, err := os.Stat(backupPath); err != nil {
+		t.Errorf("backup file should exist: %v", err)
+	}
+}

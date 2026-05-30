@@ -94,6 +94,30 @@ func TestParseSchedule_Valid(t *testing.T) {
 			wantLen: 5,
 		},
 		{
+			name:    "weekday range 0-7 deduplicates Sunday",
+			expr:    "0 9 * * 0-7",
+			wantLen: 7,
+			check: func(t *testing.T, entries []cron.CalendarEntry) {
+				seen := map[int]int{}
+				for _, e := range entries {
+					if e.Weekday == nil {
+						t.Fatalf("Weekday should be set: %+v", e)
+					}
+					seen[*e.Weekday]++
+				}
+				for day := 0; day <= 6; day++ {
+					if seen[day] != 1 {
+						t.Errorf("weekday %d count: got %d, want 1", day, seen[day])
+					}
+				}
+			},
+		},
+		{
+			name:    "weekday step */1 deduplicates Sunday",
+			expr:    "0 9 * * */1",
+			wantLen: 7,
+		},
+		{
 			name:    "cartesian product: hour and weekday",
 			expr:    "0 9-10 * * 1-2",
 			wantLen: 4, // 2 hours × 2 weekdays
@@ -208,8 +232,8 @@ func TestParseSchedule_Macros(t *testing.T) {
 
 func TestValidateSchedule(t *testing.T) {
 	tests := []struct {
-		expr     string
-		hasWarn  bool
+		expr    string
+		hasWarn bool
 	}{
 		{"0 0 31 2 *", true},  // Feb 31 does not exist
 		{"0 0 30 2 *", true},  // Feb 30 does not exist

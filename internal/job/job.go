@@ -18,7 +18,8 @@ type Job struct {
 	// Args is [command, arg1, arg2, ...].
 	Args []string
 	// Managed is true for jobs created by ldcron (com.ldcron.* with X-Ldcron-Schedule).
-	Managed bool
+	Managed   bool
+	plistPath string
 }
 
 // NewJob creates a Job with a deterministic ID based on schedule and args.

@@ -62,6 +62,9 @@ func FindDuplicate(launchAgentsDir string, j *Job) (*Job, error) {
 
 // PlistPath returns the expected plist file path for a job.
 func PlistPath(launchAgentsDir string, j *Job) string {
+	if j.plistPath != "" {
+		return j.plistPath
+	}
 	return filepath.Join(launchAgentsDir, j.Label+".plist")
 }
 
@@ -110,10 +113,11 @@ func fromPlist(path string) (*Job, error) {
 	}
 
 	return &Job{
-		ID:       id,
-		Label:    label,
-		Schedule: schedule,
-		Args:     args,
-		Managed:  managed,
+		ID:        id,
+		Label:     label,
+		Schedule:  schedule,
+		Args:      args,
+		Managed:   managed,
+		plistPath: path,
 	}, nil
 }
