@@ -26,10 +26,11 @@ func List(launchAgentsDir string) ([]*Job, []ParseWarning, error) {
 	return listMatching(pattern)
 }
 
-// ListManaged returns launchd jobs found in ldcron-named plist files.
-// ParseWarnings contains entries for ldcron-named plist files that could not be
-// parsed.
-func ListManaged(launchAgentsDir string) ([]*Job, []ParseWarning, error) {
+// ListLdcronNamed returns launchd jobs found in com.ldcron.* plist files.
+// ParseWarnings contains entries for com.ldcron.* plist files that could not be
+// parsed. A returned job is not guaranteed to be Managed; that still depends on
+// the plist carrying ldcron schedule metadata.
+func ListLdcronNamed(launchAgentsDir string) ([]*Job, []ParseWarning, error) {
 	pattern := filepath.Join(launchAgentsDir, "com.ldcron.*.plist")
 	return listMatching(pattern)
 }
@@ -69,9 +70,9 @@ func Find(launchAgentsDir, id string) (*Job, error) {
 }
 
 // FindDuplicate looks for an already registered ldcron job equivalent to the
-// given job. The current deterministic ID wins over schedule+args fallback so
-// jobs created by older ldcron releases with shorter IDs are detected without
-// taking precedence over the canonical current ID.
+// given job. The current deterministic ID wins over the schedule+args fallback.
+// The fallback is a migration safety net for legacy plist files that have not
+// yet been normalized to the current ID.
 func FindDuplicate(launchAgentsDir string, j *Job) (*Job, error) {
 	jobs, _, err := List(launchAgentsDir)
 	if err != nil {

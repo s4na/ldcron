@@ -39,7 +39,7 @@ func runMigrate(_ *cobra.Command, _ []string) error {
 	if err != nil {
 		return err
 	}
-	logD, err := logDir()
+	logD, err := migrateLogDir()
 	if err != nil {
 		return err
 	}
@@ -76,4 +76,11 @@ func runMigrate(_ *cobra.Command, _ []string) error {
 		fmt.Printf("  %s -> %s (%s)\n", result.OldID, result.NewID, action)
 	}
 	return nil
+}
+
+func migrateLogDir() (string, error) {
+	if migrateDryRun {
+		return logDirPath()
+	}
+	return logDir()
 }

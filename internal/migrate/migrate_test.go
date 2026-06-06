@@ -1,6 +1,7 @@
 package migrate_test
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -12,8 +13,9 @@ import (
 )
 
 type fakeLaunchctl struct {
-	loaded map[string]bool
-	calls  []string
+	loaded      map[string]bool
+	calls       []string
+	isLoadedErr bool
 }
 
 func newFakeLaunchctl(loaded ...string) *fakeLaunchctl {
@@ -37,8 +39,11 @@ func (f *fakeLaunchctl) Bootout(label string) error {
 	return nil
 }
 
-func (f *fakeLaunchctl) IsLoaded(label string) bool {
-	return f.loaded[label]
+func (f *fakeLaunchctl) IsLoaded(label string) (bool, error) {
+	if f.isLoadedErr {
+		return false, errors.New("launchctl unavailable")
+	}
+	return f.loaded[label], nil
 }
 
 func TestRun_MigratesLoadedLegacyManagedJobToCurrentID(t *testing.T) {
@@ -105,7 +110,9 @@ func TestRun_MigratesUnloadedLegacyPlistWithoutLoadingJob(t *testing.T) {
 	if len(lc.calls) != 0 {
 		t.Fatalf("launchctl calls: got %v, want none", lc.calls)
 	}
-	assertPlistInfo(t, filepath.Join(dir, current.Label+".plist"), current.Label, schedule, args)
+	currentPath := filepath.Join(dir, current.Label+".plist")
+	assertPlistInfo(t, currentPath, current.Label, schedule, args)
+	assertFilePerm(t, currentPath, 0o644)
 	if lc.loaded[current.Label] {
 		t.Fatal("unloaded legacy job should remain unloaded after plist migration")
 	}
@@ -208,6 +215,58 @@ func TestRun_DryRunDoesNotChangeFilesOrLaunchd(t *testing.T) {
 	}
 }
 
+func TestRun_DoesNotOverwriteExistingTemporaryPlistFile(t *testing.T) {
+	dir := t.TempDir()
+	logDir := filepath.Join(dir, "logs")
+	schedule := "0 12 * * *"
+	args := []string{"/usr/bin/true"}
+	legacyLabel := "com.ldcron.deadbeef"
+	writePlist(t, dir, legacyLabel, schedule, args, logDir)
+	current := job.NewJob(schedule, args)
+	existingTempPath := filepath.Join(dir, current.Label+".plist.tmp")
+	existingTempContent := []byte("do not overwrite")
+	if err := os.WriteFile(existingTempPath, existingTempContent, 0o644); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+
+	lc := newFakeLaunchctl()
+	if _, _, err := migrate.Run(dir, logDir, lc, migrate.Options{}); err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+
+	got, err := os.ReadFile(existingTempPath)
+	if err != nil {
+		t.Fatalf("existing temp file should remain readable: %v", err)
+	}
+	if string(got) != string(existingTempContent) {
+		t.Fatalf("existing temp file content changed: got %q, want %q", got, existingTempContent)
+	}
+	assertPlistInfo(t, filepath.Join(dir, current.Label+".plist"), current.Label, schedule, args)
+}
+
+func TestRun_AbortsWhenLaunchdLoadedStateCannotBeInspected(t *testing.T) {
+	dir := t.TempDir()
+	logDir := filepath.Join(dir, "logs")
+	schedule := "0 12 * * *"
+	args := []string{"/usr/bin/true"}
+	legacyLabel := "com.ldcron.deadbeef"
+	legacyPath := writePlist(t, dir, legacyLabel, schedule, args, logDir)
+	current := job.NewJob(schedule, args)
+
+	lc := newFakeLaunchctl()
+	lc.isLoadedErr = true
+	_, _, err := migrate.Run(dir, logDir, lc, migrate.Options{})
+	if err == nil {
+		t.Fatal("expected launchd inspection error")
+	}
+	if _, statErr := os.Stat(legacyPath); statErr != nil {
+		t.Fatalf("legacy plist should remain after inspection failure: %v", statErr)
+	}
+	if _, statErr := os.Stat(filepath.Join(dir, current.Label+".plist")); !os.IsNotExist(statErr) {
+		t.Fatalf("current plist should not be written after inspection failure, stat err=%v", statErr)
+	}
+}
+
 func writePlist(t *testing.T, dir, label, schedule string, args []string, logDir string) string {
 	t.Helper()
 	data, err := plist.Generate(label, schedule, args, logDir)
@@ -242,5 +301,16 @@ func assertCalls(t *testing.T, got, want []string) {
 	t.Helper()
 	if strings.Join(got, "\x00") != strings.Join(want, "\x00") {
 		t.Fatalf("calls: got %v, want %v", got, want)
+	}
+}
+
+func assertFilePerm(t *testing.T, path string, want os.FileMode) {
+	t.Helper()
+	info, err := os.Stat(path)
+	if err != nil {
+		t.Fatalf("Stat(%s): %v", path, err)
+	}
+	if got := info.Mode().Perm(); got != want {
+		t.Fatalf("mode: got %o, want %o", got, want)
 	}
 }

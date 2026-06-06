@@ -53,7 +53,11 @@ func TestIsLoaded_CommandArgs(t *testing.T) {
 		return nil
 	})
 
-	if !c.IsLoaded("com.ldcron.abc12345") {
+	loaded, err := c.IsLoaded("com.ldcron.abc12345")
+	if err != nil {
+		t.Fatalf("IsLoaded: %v", err)
+	}
+	if !loaded {
 		t.Fatal("expected loaded service")
 	}
 	if len(gotArgs) != 2 || gotArgs[0] != "print" || gotArgs[1] != "gui/501/com.ldcron.abc12345" {
@@ -61,13 +65,35 @@ func TestIsLoaded_CommandArgs(t *testing.T) {
 	}
 }
 
-func TestIsLoaded_ReturnsFalseOnError(t *testing.T) {
+func TestIsLoaded_ReturnsFalseForMissingService(t *testing.T) {
 	c := newTestClient("gui/501", func(_ string, _ ...string) error {
-		return errors.New("service not found")
+		return errors.New("Bad request.\nCould not find service \"com.ldcron.missing\" in domain")
 	})
 
-	if c.IsLoaded("com.ldcron.missing") {
+	loaded, err := c.IsLoaded("com.ldcron.missing")
+	if err != nil {
+		t.Fatalf("IsLoaded: %v", err)
+	}
+	if loaded {
 		t.Fatal("expected missing service to be reported as unloaded")
+	}
+}
+
+func TestIsLoaded_ReturnsErrorForUnexpectedFailure(t *testing.T) {
+	want := errors.New("launchctl unavailable")
+	c := newTestClient("gui/501", func(_ string, _ ...string) error {
+		return want
+	})
+
+	loaded, err := c.IsLoaded("com.ldcron.missing")
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if loaded {
+		t.Fatal("unexpected failure should not be reported as loaded")
+	}
+	if !errors.Is(err, want) {
+		t.Fatalf("error: got %v, want wrapping %v", err, want)
 	}
 }
 

@@ -16,7 +16,7 @@ import (
 type Launchctl interface {
 	Bootstrap(plistPath string) error
 	Bootout(label string) error
-	IsLoaded(label string) bool
+	IsLoaded(label string) (bool, error)
 }
 
 // Options controls migration behavior.
@@ -38,7 +38,7 @@ type Result struct {
 // current deterministic ID. Loaded jobs are moved from the legacy launchd label
 // to the current label; unloaded plist files are only rewritten on disk.
 func Run(launchAgentsDir, logDir string, lc Launchctl, opts Options) ([]Result, []job.ParseWarning, error) {
-	jobs, warnings, err := job.ListManaged(launchAgentsDir)
+	jobs, warnings, err := job.ListLdcronNamed(launchAgentsDir)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -85,7 +85,11 @@ func migrateOne(launchAgentsDir, logDir string, lc Launchctl, opts Options, lega
 			return result, fmt.Errorf("cannot migrate %s: target plist already exists with different job: %s", legacy.ID, newPath)
 		}
 		result.Consolidated = true
-		result.WasLoaded = isLoaded(lc, legacy.Label)
+		wasLoaded, err := isLoaded(lc, legacy.Label)
+		if err != nil {
+			return result, err
+		}
+		result.WasLoaded = wasLoaded
 		if opts.DryRun {
 			return result, nil
 		}
@@ -104,7 +108,11 @@ func migrateOne(launchAgentsDir, logDir string, lc Launchctl, opts Options, lega
 		return result, fmt.Errorf("cannot inspect target plist %s: %w", newPath, err)
 	}
 
-	result.WasLoaded = isLoaded(lc, legacy.Label)
+	wasLoaded, err := isLoaded(lc, legacy.Label)
+	if err != nil {
+		return result, err
+	}
+	result.WasLoaded = wasLoaded
 	if opts.DryRun {
 		return result, nil
 	}
@@ -168,8 +176,15 @@ func sameManagedJob(existing, current *job.Job) bool {
 		slices.Equal(existing.Args, current.Args)
 }
 
-func isLoaded(lc Launchctl, label string) bool {
-	return lc != nil && lc.IsLoaded(label)
+func isLoaded(lc Launchctl, label string) (bool, error) {
+	if lc == nil {
+		return false, nil
+	}
+	loaded, err := lc.IsLoaded(label)
+	if err != nil {
+		return false, fmt.Errorf("failed to inspect launchd job %s: %w", label, err)
+	}
+	return loaded, nil
 }
 
 func moveLaunchdLabel(lc Launchctl, legacy *job.Job, currentPath string, legacyLoaded bool) error {
@@ -180,7 +195,12 @@ func moveLaunchdLabel(lc Launchctl, legacy *job.Job, currentPath string, legacyL
 		return fmt.Errorf("failed to unload legacy job %s: %w", legacy.ID, err)
 	}
 	currentLabel := strings.TrimSuffix(filepath.Base(currentPath), ".plist")
-	if !isLoaded(lc, currentLabel) {
+	currentLoaded, err := isLoaded(lc, currentLabel)
+	if err != nil {
+		_ = lc.Bootstrap(legacy.Path)
+		return err
+	}
+	if !currentLoaded {
 		if err := lc.Bootstrap(currentPath); err != nil {
 			_ = lc.Bootstrap(legacy.Path)
 			return fmt.Errorf("failed to load current job for migrated legacy job %s: %w", legacy.ID, err)
@@ -193,9 +213,23 @@ func writeTempPlist(targetPath string, data []byte) (string, error) {
 	if err := os.MkdirAll(filepath.Dir(targetPath), 0o755); err != nil {
 		return "", fmt.Errorf("failed to create LaunchAgents directory: %w", err)
 	}
-	tmpPath := targetPath + ".tmp"
-	if err := os.WriteFile(tmpPath, data, 0o644); err != nil {
+	tmpFile, err := os.CreateTemp(filepath.Dir(targetPath), filepath.Base(targetPath)+".*.tmp")
+	if err != nil {
+		return "", fmt.Errorf("failed to create temporary migrated plist: %w", err)
+	}
+	tmpPath := tmpFile.Name()
+	if _, err := tmpFile.Write(data); err != nil {
+		_ = tmpFile.Close()
+		_ = os.Remove(tmpPath)
 		return "", fmt.Errorf("failed to write temporary migrated plist: %w", err)
+	}
+	if err := tmpFile.Close(); err != nil {
+		_ = os.Remove(tmpPath)
+		return "", fmt.Errorf("failed to close temporary migrated plist: %w", err)
+	}
+	if err := os.Chmod(tmpPath, 0o644); err != nil {
+		_ = os.Remove(tmpPath)
+		return "", fmt.Errorf("failed to set migrated plist permissions: %w", err)
 	}
 	return tmpPath, nil
 }
