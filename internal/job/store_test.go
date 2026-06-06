@@ -92,6 +92,58 @@ func TestList_IncludesExternalPlists(t *testing.T) {
 	}
 }
 
+func TestListLdcronNamed_IgnoresExternalPlistsAndWarnings(t *testing.T) {
+	j := job.NewJob("0 12 * * *", []string{"/usr/bin/foo"})
+	dir := setupTestDir(t, j)
+	if err := os.WriteFile(filepath.Join(dir, "bad.plist"), []byte("not xml"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	externalPlist := `<?xml version="1.0" encoding="UTF-8"?>
+<plist version="1.0"><dict>
+	<key>Label</key><string>com.apple.foo</string>
+	<key>ProgramArguments</key><array><string>/usr/bin/foo</string></array>
+</dict></plist>`
+	if err := os.WriteFile(filepath.Join(dir, "com.apple.foo.plist"), []byte(externalPlist), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	jobs, warnings, err := job.ListLdcronNamed(dir)
+	if err != nil {
+		t.Fatalf("ListLdcronNamed: %v", err)
+	}
+	if len(jobs) != 1 {
+		t.Fatalf("expected 1 managed job, got %d", len(jobs))
+	}
+	if jobs[0].ID != j.ID {
+		t.Errorf("ID: got %q, want %q", jobs[0].ID, j.ID)
+	}
+	if len(warnings) != 0 {
+		t.Fatalf("expected no warnings for external plist files, got %+v", warnings)
+	}
+}
+
+func TestListLdcronNamed_WarnsForMalformedLdcronPlist(t *testing.T) {
+	dir := t.TempDir()
+	badPath := filepath.Join(dir, "com.ldcron.bad.plist")
+	if err := os.WriteFile(badPath, []byte("not xml"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	jobs, warnings, err := job.ListLdcronNamed(dir)
+	if err != nil {
+		t.Fatalf("ListLdcronNamed: %v", err)
+	}
+	if len(jobs) != 0 {
+		t.Fatalf("expected no jobs, got %d", len(jobs))
+	}
+	if len(warnings) != 1 {
+		t.Fatalf("expected 1 warning, got %d", len(warnings))
+	}
+	if warnings[0].Path != badPath {
+		t.Errorf("warning path: got %q, want %q", warnings[0].Path, badPath)
+	}
+}
+
 func TestList_ManagedFlagSetForLdcronJobs(t *testing.T) {
 	j := job.NewJob("0 12 * * *", []string{"/usr/bin/foo"})
 	dir := setupTestDir(t, j)
@@ -195,6 +247,98 @@ func TestFindDuplicate_DetectsDuplicate(t *testing.T) {
 	}
 	if dup == nil {
 		t.Error("expected duplicate, got nil")
+	}
+}
+
+func TestFindDuplicate_DetectsLegacyManagedJobWithSameScheduleAndArgs(t *testing.T) {
+	dir := t.TempDir()
+	schedule := "0 12 * * *"
+	args := []string{"/usr/bin/foo"}
+
+	legacyLabel := "com.ldcron.deadbeef"
+	data, err := plist.Generate(legacyLabel, schedule, args, filepath.Join(dir, "logs"))
+	if err != nil {
+		t.Fatalf("Generate: %v", err)
+	}
+	if writeErr := os.WriteFile(filepath.Join(dir, legacyLabel+".plist"), data, 0o644); writeErr != nil {
+		t.Fatalf("WriteFile: %v", writeErr)
+	}
+
+	current := job.NewJob(schedule, args)
+	if current.ID == "deadbeef" {
+		t.Fatalf("test setup unexpectedly produced legacy ID %q", current.ID)
+	}
+
+	dup, err := job.FindDuplicate(dir, current)
+	if err != nil {
+		t.Fatalf("FindDuplicate: %v", err)
+	}
+	if dup == nil {
+		t.Fatal("expected duplicate, got nil")
+	}
+	if dup.ID != "deadbeef" {
+		t.Errorf("duplicate ID: got %q, want deadbeef", dup.ID)
+	}
+	if !dup.Managed {
+		t.Error("legacy ldcron plist should still be treated as managed")
+	}
+}
+
+func TestFindDuplicate_DoesNotMatchLegacyManagedJobWithDifferentArgs(t *testing.T) {
+	dir := t.TempDir()
+	schedule := "0 12 * * *"
+
+	legacyLabel := "com.ldcron.deadbeef"
+	data, err := plist.Generate(legacyLabel, schedule, []string{"/usr/bin/foo"}, filepath.Join(dir, "logs"))
+	if err != nil {
+		t.Fatalf("Generate: %v", err)
+	}
+	if writeErr := os.WriteFile(filepath.Join(dir, legacyLabel+".plist"), data, 0o644); writeErr != nil {
+		t.Fatalf("WriteFile: %v", writeErr)
+	}
+
+	current := job.NewJob(schedule, []string{"/usr/bin/bar"})
+	dup, err := job.FindDuplicate(dir, current)
+	if err != nil {
+		t.Fatalf("FindDuplicate: %v", err)
+	}
+	if dup != nil {
+		t.Fatalf("expected no duplicate for different args, got %+v", dup)
+	}
+}
+
+func TestFindDuplicate_PrefersCurrentIDOverLegacyScheduleMatch(t *testing.T) {
+	dir := t.TempDir()
+	schedule := "0 12 * * *"
+	args := []string{"/usr/bin/foo"}
+
+	legacyLabel := "com.ldcron.deadbeef"
+	legacyData, err := plist.Generate(legacyLabel, schedule, args, filepath.Join(dir, "logs"))
+	if err != nil {
+		t.Fatalf("Generate legacy: %v", err)
+	}
+	if writeErr := os.WriteFile(filepath.Join(dir, legacyLabel+".plist"), legacyData, 0o644); writeErr != nil {
+		t.Fatalf("WriteFile legacy: %v", writeErr)
+	}
+
+	current := job.NewJob(schedule, args)
+	currentData, err := plist.Generate(current.Label, current.Schedule, current.Args, filepath.Join(dir, "logs"))
+	if err != nil {
+		t.Fatalf("Generate current: %v", err)
+	}
+	if writeErr := os.WriteFile(filepath.Join(dir, current.Label+".plist"), currentData, 0o644); writeErr != nil {
+		t.Fatalf("WriteFile current: %v", writeErr)
+	}
+
+	dup, err := job.FindDuplicate(dir, current)
+	if err != nil {
+		t.Fatalf("FindDuplicate: %v", err)
+	}
+	if dup == nil {
+		t.Fatal("expected duplicate, got nil")
+	}
+	if dup.ID != current.ID {
+		t.Errorf("duplicate ID: got %q, want current ID %q", dup.ID, current.ID)
 	}
 }
 

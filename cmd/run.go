@@ -23,8 +23,8 @@ With --force, any currently running instance is killed before restarting.
 Omit --force unless you need to forcefully restart the job.
 
 Examples:
-  ldcron run abc12345
-  ldcron run --force abc12345`,
+  ldcron run a1b2c3d4e5f6a7b8
+  ldcron run --force a1b2c3d4e5f6a7b8`,
 	Args:         cobra.ExactArgs(1),
 	SilenceUsage: true,
 	RunE:         runRun,

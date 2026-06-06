@@ -23,6 +23,15 @@ class Ldcron < Formula
     end
   end
 
+  def post_install
+    return unless quiet_system "#{bin}/ldcron", "migrate", "--help"
+
+    system "#{bin}/ldcron", "migrate", "--quiet"
+  rescue RuntimeError => e
+    opoo "ldcron plist migration did not complete: #{e.message}"
+    opoo "Run `ldcron migrate` to retry."
+  end
+
   test do
     # Test that the binary runs and shows help
     assert_match "ldcron", shell_output("#{bin}/ldcron --help")

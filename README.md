@@ -38,11 +38,15 @@ brew tap s4na/ldcron https://github.com/s4na/ldcron
 brew install ldcron
 ```
 
+Homebrewでインストール・アップグレードした場合、既存の旧形式ldcron plistはインストール後に自動で現在のID形式へ移行されます。移行に失敗した場合は警告が表示され、`ldcron migrate`で再実行できます。
+
 ### go install
 
 ```bash
 go install github.com/s4na/ldcron@latest
 ```
+
+`go install`でv0.1.2以前からアップグレードした場合は、インストール後に`ldcron migrate`を実行してください。
 
 **動作要件:** macOS 12 (Monterey) 以降
 
@@ -58,13 +62,13 @@ ldcron add "0 12 * * *" /usr/local/bin/backup.sh
 ldcron list
 
 # ジョブを即時実行（動作確認に）
-ldcron run a1b2c3d4
+ldcron run a1b2c3d4e5f6a7b8
 
 # ログをリアルタイムで確認
-tail -f ~/Library/Logs/ldcron/a1b2c3d4.log
+tail -f ~/Library/Logs/ldcron/a1b2c3d4e5f6a7b8.log
 
 # ジョブを削除
-ldcron remove a1b2c3d4
+ldcron remove a1b2c3d4e5f6a7b8
 ```
 
 ---
@@ -102,11 +106,11 @@ ldcron add "0 * * * *" $'cd /tmp\nfind . -name "*.log" -mtime +30 -delete\necho 
 ```
 
 ```
-ジョブを追加しました
-  ID:       a1b2c3d4
-  スケジュール: 0 12 * * *
-  コマンド:   /usr/local/bin/backup.sh
-  ログ:      ~/Library/Logs/ldcron/a1b2c3d4.log
+Job added
+  ID:       a1b2c3d4e5f6a7b8
+  Schedule: 0 12 * * *
+  Command:  /usr/local/bin/backup.sh
+  Log:      ~/Library/Logs/ldcron/a1b2c3d4e5f6a7b8.log
 ```
 
 > **補足:** 同一のスケジュール＋コマンドの重複登録は防止されます。同じ入力からは常に同じIDが生成されます。
@@ -131,6 +135,29 @@ com.apple.ccachefixer     -               /usr/libexec/ccachefixer
 
 ---
 
+### `migrate` — 旧形式のldcronジョブを移行する
+
+```
+ldcron migrate [--dry-run]
+```
+
+v0.1.2以前に作成された8文字IDのldcron管理plistを、現在の16文字ID形式へ移行します。ロード中のジョブは旧launchdラベルから新launchdラベルへ載せ替え、ロードされていないplistはファイルだけを書き換えます。
+
+```bash
+# 変更内容を確認
+ldcron migrate --dry-run
+
+# 移行を実行
+ldcron migrate
+```
+
+```
+Migrated legacy ldcron jobs:
+  a1b2c3d4 -> a1b2c3d4e5f6a7b8 (migrated)
+```
+
+---
+
 ### `remove` — ジョブを削除する
 
 ```
@@ -145,10 +172,10 @@ ldcron remove com.apple.ccachefixer
 ```
 
 ```
-ジョブを削除しました
-  ID:       a1b2c3d4
-  スケジュール: 0 12 * * *
-  コマンド:   /usr/local/bin/backup.sh
+Job removed
+  ID:       a1b2c3d4e5f6a7b8
+  Schedule: 0 12 * * *
+  Command:  /usr/local/bin/backup.sh
 ```
 
 ---
@@ -173,10 +200,13 @@ ldcron run --force a1b2c3d4e5f6a7b8
 ```
 
 ```
-ジョブをバックグラウンドで起動しました
-  ID:      a1b2c3d4
-  コマンド: /usr/local/bin/backup.sh
-  ログ:    ~/Library/Logs/ldcron/a1b2c3d4.log
+Job started in background
+  ID:      a1b2c3d4e5f6a7b8
+  Command: /usr/local/bin/backup.sh
+  Log:     ~/Library/Logs/ldcron/a1b2c3d4e5f6a7b8.log
+
+Follow log output:
+  tail -f ~/Library/Logs/ldcron/a1b2c3d4e5f6a7b8.log
 ```
 
 > **補足:** `--force`なしでは、すでに実行中のジョブはエラーを返します。`--force`は実行中のインスタンスを強制終了してから再起動します。実行中のジョブを中断してよい場合のみ使用してください。
@@ -231,10 +261,10 @@ ldcron run --force a1b2c3d4e5f6a7b8
 
 ```bash
 # リアルタイムで確認
-tail -f ~/Library/Logs/ldcron/a1b2c3d4.log
+tail -f ~/Library/Logs/ldcron/a1b2c3d4e5f6a7b8.log
 
 # 最後の100行を表示
-tail -n 100 ~/Library/Logs/ldcron/a1b2c3d4.log
+tail -n 100 ~/Library/Logs/ldcron/a1b2c3d4e5f6a7b8.log
 ```
 
 ### ログローテーション
@@ -274,7 +304,7 @@ ldcron log setup-rotation | sudo tee /etc/newsyslog.d/com.ldcron.conf
 ## トラブルシューティング
 
 **v0.1.2以前からのアップグレード**
-v0.1.3でジョブIDが8文字から16文字に変更されました。既存のジョブはそのまま動作し続けますが、同じスケジュール＋コマンドを再登録すると重複として検出されず新しいエントリが作成されます。`ldcron list`で古い8文字のIDを確認し、`ldcron remove <古いID>`でアンロードしてから再登録してください。
+v0.1.3でジョブIDが8文字から16文字に変更されました。Homebrewでインストール・アップグレードした場合は、インストール後に既存の8文字ID plistを現在の16文字ID形式へ自動移行します。`go install`を使った場合、またはHomebrewの移行警告が表示された場合は、`ldcron migrate`を実行してください。事前に変更内容を確認したい場合は`ldcron migrate --dry-run`を使えます。
 
 **`already registered`（すでに登録済みです）**
 同一のスケジュール＋コマンドがすでに登録されています。`ldcron list`で既存ジョブを確認し、必要であれば`ldcron remove`で削除してから再登録してください。

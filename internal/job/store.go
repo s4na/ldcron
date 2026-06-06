@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -22,6 +23,19 @@ type ParseWarning struct {
 // ParseWarnings contains entries for plist files that could not be parsed.
 func List(launchAgentsDir string) ([]*Job, []ParseWarning, error) {
 	pattern := filepath.Join(launchAgentsDir, "*.plist")
+	return listMatching(pattern)
+}
+
+// ListLdcronNamed returns launchd jobs found in com.ldcron.* plist files.
+// ParseWarnings contains entries for com.ldcron.* plist files that could not be
+// parsed. A returned job is not guaranteed to be Managed; that still depends on
+// the plist carrying ldcron schedule metadata.
+func ListLdcronNamed(launchAgentsDir string) ([]*Job, []ParseWarning, error) {
+	pattern := filepath.Join(launchAgentsDir, "com.ldcron.*.plist")
+	return listMatching(pattern)
+}
+
+func listMatching(pattern string) ([]*Job, []ParseWarning, error) {
 	matches, err := filepath.Glob(pattern)
 	if err != nil {
 		return nil, nil, err
@@ -55,9 +69,26 @@ func Find(launchAgentsDir, id string) (*Job, error) {
 	return nil, nil
 }
 
-// FindDuplicate looks for a job with the same ID as the given job.
+// FindDuplicate looks for an already registered ldcron job equivalent to the
+// given job. The current deterministic ID wins over the schedule+args fallback.
+// The fallback is a migration safety net for legacy plist files that have not
+// yet been normalized to the current ID.
 func FindDuplicate(launchAgentsDir string, j *Job) (*Job, error) {
-	return Find(launchAgentsDir, j.ID)
+	jobs, _, err := List(launchAgentsDir)
+	if err != nil {
+		return nil, err
+	}
+	for _, existing := range jobs {
+		if existing.ID == j.ID {
+			return existing, nil
+		}
+	}
+	for _, existing := range jobs {
+		if existing.Managed && j.Managed && existing.Schedule == j.Schedule && slices.Equal(existing.Args, j.Args) {
+			return existing, nil
+		}
+	}
+	return nil, nil
 }
 
 // PlistPath returns the discovered plist path when available, otherwise the label-derived path.
@@ -109,7 +140,7 @@ func fromPlist(path string) (*Job, error) {
 	}
 
 	if len(args) == 0 {
-		return nil, fmt.Errorf("ProgramArguments not found")
+		return nil, fmt.Errorf("ProgramArguments, Program, or BundleProgram not found")
 	}
 
 	return &Job{

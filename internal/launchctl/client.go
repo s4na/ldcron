@@ -6,6 +6,7 @@ import (
 	"os/exec"
 	"os/user"
 	"strconv"
+	"strings"
 )
 
 // Client executes launchctl commands in the gui/<uid> domain.
@@ -42,6 +43,17 @@ func (c *Client) Bootout(label string) error {
 		return fmt.Errorf("launchctl bootout: %w", err)
 	}
 	return nil
+}
+
+// IsLoaded reports whether launchd currently knows about label in the domain.
+func (c *Client) IsLoaded(label string) (bool, error) {
+	if err := c.run("launchctl", "print", c.Domain+"/"+label); err != nil {
+		if strings.Contains(err.Error(), "Could not find service") {
+			return false, nil
+		}
+		return false, fmt.Errorf("launchctl print: %w", err)
+	}
+	return true, nil
 }
 
 // Kickstart triggers an immediate run of the service (non-blocking).

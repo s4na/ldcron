@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 
@@ -59,10 +60,11 @@ func Write(dir, label, schedule string, args []string, logDir string) (string, e
 	return path, nil
 }
 
-// ReadPlistInfo reads Label, X-Ldcron-Schedule (optional), and ProgramArguments
-// from any launchd plist file. If X-Ldcron-Schedule is absent, schedule is
-// returned as an empty string without error. If Label is absent in the plist,
-// the filename stem is used as the label.
+// ReadPlistInfo reads Label, X-Ldcron-Schedule (optional), and the launchd
+// command source (ProgramArguments, Program, or BundleProgram) from any launchd
+// plist file. If X-Ldcron-Schedule is absent, schedule is returned as an empty
+// string without error. If Label is absent in the plist, the filename stem is
+// used as the label.
 func ReadPlistInfo(path string) (label, schedule string, args []string, err error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -70,7 +72,14 @@ func ReadPlistInfo(path string) (label, schedule string, args []string, err erro
 	}
 	label, schedule, args, err = parsePlistInfoFromXML(data)
 	if err != nil {
-		return "", "", nil, err
+		normalized, normalizeErr := normalizePlistXML(path)
+		if normalizeErr != nil {
+			return "", "", nil, fmt.Errorf("%w; failed to normalize plist with plutil: %v", err, normalizeErr)
+		}
+		label, schedule, args, err = parsePlistInfoFromXML(normalized)
+		if err != nil {
+			return "", "", nil, err
+		}
 	}
 	if label == "" {
 		base := filepath.Base(path)
@@ -79,53 +88,199 @@ func ReadPlistInfo(path string) (label, schedule string, args []string, err erro
 	return label, schedule, args, nil
 }
 
-// parsePlistInfoFromXML reads Label, X-Ldcron-Schedule, Program, and
-// ProgramArguments from raw plist XML without requiring X-Ldcron-Schedule to
-// be present. If ProgramArguments is absent but Program is set, args is
-// returned as []string{program} to support both launchd plist variants.
+// normalizePlistXML asks macOS' native plist tool to render any valid plist
+// representation (including binary plists) as XML.
+func normalizePlistXML(path string) ([]byte, error) {
+	cmd := exec.Command("/usr/bin/plutil", "-convert", "xml1", "-o", "-", "--", path)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return nil, fmt.Errorf("%w: %s", err, strings.TrimSpace(string(out)))
+	}
+	return out, nil
+}
+
+// parsePlistInfoFromXML reads top-level Label, X-Ldcron-Schedule, Program,
+// BundleProgram, and ProgramArguments from raw plist XML without requiring
+// X-Ldcron-Schedule to be present.
 func parsePlistInfoFromXML(data []byte) (label, schedule string, args []string, err error) {
+	dict, err := decodeRootDict(data)
+	if err != nil {
+		return "", "", nil, err
+	}
+
+	label = stringValue(dict["Label"])
+	schedule = stringValue(dict[scheduleKey])
+	program := stringValue(dict["Program"])
+	bundleProgram := stringValue(dict["BundleProgram"])
+	programArgs := stringArrayValue(dict["ProgramArguments"])
+	args = launchdCommandArgs(program, bundleProgram, programArgs)
+	return label, schedule, args, nil
+}
+
+type plistValue struct {
+	kind  string
+	str   string
+	array []string
+}
+
+func decodeRootDict(data []byte) (map[string]plistValue, error) {
 	dec := xml.NewDecoder(bytes.NewReader(data))
-	var lastKey string
-	var program string
 	for {
 		tok, xmlErr := dec.Token()
 		if xmlErr != nil {
 			if xmlErr != io.EOF {
-				err = fmt.Errorf("failed to decode XML: %w", xmlErr)
+				return nil, fmt.Errorf("failed to decode XML: %w", xmlErr)
 			}
 			break
 		}
+		start, ok := tok.(xml.StartElement)
+		if !ok {
+			continue
+		}
+		if start.Name.Local == "plist" {
+			continue
+		}
+		if start.Name.Local != "dict" {
+			return nil, fmt.Errorf("plist root must contain a dict, got <%s>", start.Name.Local)
+		}
+		return decodePlistDict(dec)
+	}
+	return nil, fmt.Errorf("plist root dict not found")
+}
+
+func decodePlistValue(dec *xml.Decoder, start xml.StartElement) (plistValue, error) {
+	switch start.Name.Local {
+	case "dict":
+		if _, err := decodePlistDict(dec); err != nil {
+			return plistValue{}, err
+		}
+		return plistValue{kind: "dict"}, nil
+	case "array":
+		return decodePlistArray(dec)
+	case "string", "integer", "real", "date", "data":
+		var s string
+		if err := dec.DecodeElement(&s, &start); err != nil {
+			return plistValue{}, fmt.Errorf("failed to decode <%s>: %w", start.Name.Local, err)
+		}
+		return plistValue{kind: start.Name.Local, str: s}, nil
+	case "true", "false":
+		var discard struct{}
+		if err := dec.DecodeElement(&discard, &start); err != nil {
+			return plistValue{}, fmt.Errorf("failed to decode <%s>: %w", start.Name.Local, err)
+		}
+		return plistValue{kind: "bool", str: start.Name.Local}, nil
+	default:
+		var discard struct{}
+		if err := dec.DecodeElement(&discard, &start); err != nil {
+			return plistValue{}, fmt.Errorf("failed to skip <%s>: %w", start.Name.Local, err)
+		}
+		return plistValue{kind: start.Name.Local}, nil
+	}
+}
+
+func decodePlistDict(dec *xml.Decoder) (map[string]plistValue, error) {
+	result := make(map[string]plistValue)
+	for {
+		tok, err := dec.Token()
+		if err != nil {
+			return nil, fmt.Errorf("failed to decode dict: %w", err)
+		}
 		switch t := tok.(type) {
+		case xml.EndElement:
+			if t.Name.Local == "dict" {
+				return result, nil
+			}
 		case xml.StartElement:
-			switch t.Name.Local {
-			case "key":
-				var s string
-				if e := dec.DecodeElement(&s, &t); e == nil {
-					lastKey = s
-				}
-			case "string":
-				var s string
-				if e := dec.DecodeElement(&s, &t); e == nil {
-					switch lastKey {
-					case "Label":
-						label = s
-					case scheduleKey:
-						schedule = s
-					case "Program":
-						program = s
-					}
-				}
-			case "array":
-				if lastKey == "ProgramArguments" {
-					args = decodeStringArray(dec, t)
-				}
+			if t.Name.Local != "key" {
+				return nil, fmt.Errorf("expected <key> in dict, got <%s>", t.Name.Local)
+			}
+			var key string
+			if err := dec.DecodeElement(&key, &t); err != nil {
+				return nil, fmt.Errorf("failed to decode dict key: %w", err)
+			}
+			valueStart, err := nextStartElement(dec)
+			if err != nil {
+				return nil, fmt.Errorf("missing value for key %q: %w", key, err)
+			}
+			value, err := decodePlistValue(dec, valueStart)
+			if err != nil {
+				return nil, fmt.Errorf("failed to decode value for key %q: %w", key, err)
+			}
+			result[key] = value
+		}
+	}
+}
+
+func decodePlistArray(dec *xml.Decoder) (plistValue, error) {
+	var result []string
+	for {
+		tok, err := dec.Token()
+		if err != nil {
+			return plistValue{}, fmt.Errorf("failed to decode array: %w", err)
+		}
+		switch t := tok.(type) {
+		case xml.EndElement:
+			if t.Name.Local == "array" {
+				return plistValue{kind: "array", array: result}, nil
+			}
+		case xml.StartElement:
+			value, err := decodePlistValue(dec, t)
+			if err != nil {
+				return plistValue{}, err
+			}
+			if value.kind == "string" {
+				result = append(result, value.str)
 			}
 		}
 	}
-	if len(args) == 0 && program != "" {
-		args = []string{program}
+}
+
+func nextStartElement(dec *xml.Decoder) (xml.StartElement, error) {
+	for {
+		tok, err := dec.Token()
+		if err != nil {
+			return xml.StartElement{}, err
+		}
+		switch t := tok.(type) {
+		case xml.StartElement:
+			return t, nil
+		case xml.EndElement:
+			return xml.StartElement{}, fmt.Errorf("unexpected </%s>", t.Name.Local)
+		}
 	}
-	return
+}
+
+func stringValue(value plistValue) string {
+	if value.kind != "string" {
+		return ""
+	}
+	return value.str
+}
+
+func stringArrayValue(value plistValue) []string {
+	if value.kind != "array" {
+		return nil
+	}
+	result := make([]string, len(value.array))
+	copy(result, value.array)
+	return result
+}
+
+func launchdCommandArgs(program, bundleProgram string, programArgs []string) []string {
+	executable := program
+	if executable == "" {
+		executable = bundleProgram
+	}
+	if executable == "" {
+		return programArgs
+	}
+	if len(programArgs) <= 1 {
+		return []string{executable}
+	}
+	args := make([]string, 0, len(programArgs))
+	args = append(args, executable)
+	args = append(args, programArgs[1:]...)
+	return args
 }
 
 // --- XML document model (hand-rolled to match Apple plist DTD) ---
@@ -216,28 +371,4 @@ func buildCalendarItems(entries []cron.CalendarEntry) []xmlNode {
 		items = append(items, xmlNode{XMLName: xml.Name{Local: "dict"}, Items: kv})
 	}
 	return items
-}
-
-func decodeStringArray(dec *xml.Decoder, _ xml.StartElement) []string {
-	var result []string
-	for {
-		tok, err := dec.Token()
-		if err != nil {
-			break
-		}
-		switch t := tok.(type) {
-		case xml.StartElement:
-			if t.Name.Local == "string" {
-				var s string
-				if e := dec.DecodeElement(&s, &t); e == nil {
-					result = append(result, s)
-				}
-			}
-		case xml.EndElement:
-			if t.Name.Local == "array" {
-				return result
-			}
-		}
-	}
-	return result
 }
