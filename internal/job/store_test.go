@@ -255,6 +255,41 @@ func TestFindDuplicate_DoesNotMatchLegacyManagedJobWithDifferentArgs(t *testing.
 	}
 }
 
+func TestFindDuplicate_PrefersCurrentIDOverLegacyScheduleMatch(t *testing.T) {
+	dir := t.TempDir()
+	schedule := "0 12 * * *"
+	args := []string{"/usr/bin/foo"}
+
+	legacyLabel := "com.ldcron.deadbeef"
+	legacyData, err := plist.Generate(legacyLabel, schedule, args, filepath.Join(dir, "logs"))
+	if err != nil {
+		t.Fatalf("Generate legacy: %v", err)
+	}
+	if writeErr := os.WriteFile(filepath.Join(dir, legacyLabel+".plist"), legacyData, 0o644); writeErr != nil {
+		t.Fatalf("WriteFile legacy: %v", writeErr)
+	}
+
+	current := job.NewJob(schedule, args)
+	currentData, err := plist.Generate(current.Label, current.Schedule, current.Args, filepath.Join(dir, "logs"))
+	if err != nil {
+		t.Fatalf("Generate current: %v", err)
+	}
+	if writeErr := os.WriteFile(filepath.Join(dir, current.Label+".plist"), currentData, 0o644); writeErr != nil {
+		t.Fatalf("WriteFile current: %v", writeErr)
+	}
+
+	dup, err := job.FindDuplicate(dir, current)
+	if err != nil {
+		t.Fatalf("FindDuplicate: %v", err)
+	}
+	if dup == nil {
+		t.Fatal("expected duplicate, got nil")
+	}
+	if dup.ID != current.ID {
+		t.Errorf("duplicate ID: got %q, want current ID %q", dup.ID, current.ID)
+	}
+}
+
 func TestFindDuplicate_NoDuplicateForDifferentJob(t *testing.T) {
 	j := job.NewJob("0 12 * * *", []string{"/usr/bin/foo"})
 	dir := setupTestDir(t, j)

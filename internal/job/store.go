@@ -57,9 +57,9 @@ func Find(launchAgentsDir, id string) (*Job, error) {
 }
 
 // FindDuplicate looks for an already registered ldcron job equivalent to the
-// given job. It first checks the current deterministic ID, then falls back to
-// schedule+args so jobs created by older ldcron releases with shorter IDs are
-// still treated as duplicates instead of being re-registered.
+// given job. The current deterministic ID wins over schedule+args fallback so
+// jobs created by older ldcron releases with shorter IDs are detected without
+// taking precedence over the canonical current ID.
 func FindDuplicate(launchAgentsDir string, j *Job) (*Job, error) {
 	jobs, _, err := List(launchAgentsDir)
 	if err != nil {
@@ -69,6 +69,8 @@ func FindDuplicate(launchAgentsDir string, j *Job) (*Job, error) {
 		if existing.ID == j.ID {
 			return existing, nil
 		}
+	}
+	for _, existing := range jobs {
 		if existing.Managed && j.Managed && existing.Schedule == j.Schedule && slices.Equal(existing.Args, j.Args) {
 			return existing, nil
 		}
@@ -125,7 +127,7 @@ func fromPlist(path string) (*Job, error) {
 	}
 
 	if len(args) == 0 {
-		return nil, fmt.Errorf("ProgramArguments not found")
+		return nil, fmt.Errorf("ProgramArguments, Program, or BundleProgram not found")
 	}
 
 	return &Job{

@@ -60,10 +60,11 @@ func Write(dir, label, schedule string, args []string, logDir string) (string, e
 	return path, nil
 }
 
-// ReadPlistInfo reads Label, X-Ldcron-Schedule (optional), and ProgramArguments
-// from any launchd plist file. If X-Ldcron-Schedule is absent, schedule is
-// returned as an empty string without error. If Label is absent in the plist,
-// the filename stem is used as the label.
+// ReadPlistInfo reads Label, X-Ldcron-Schedule (optional), and the launchd
+// command source (ProgramArguments, Program, or BundleProgram) from any launchd
+// plist file. If X-Ldcron-Schedule is absent, schedule is returned as an empty
+// string without error. If Label is absent in the plist, the filename stem is
+// used as the label.
 func ReadPlistInfo(path string) (label, schedule string, args []string, err error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
