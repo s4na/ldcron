@@ -34,6 +34,7 @@ func init() {
 	rootCmd.AddCommand(listCmd)
 	rootCmd.AddCommand(removeCmd)
 	rootCmd.AddCommand(runCmd)
+	rootCmd.AddCommand(migrateCmd)
 	rootCmd.AddCommand(logCmd)
 
 	// Save the default subcommand help, then set a custom help for the root command.
@@ -77,6 +78,7 @@ Commands:
   list                                     List all registered jobs
   remove  <id>                             Delete a job by ID
   run     <id>                             Run a job immediately
+  migrate                                  Migrate legacy ldcron jobs
   log     setup-rotation                   Print newsyslog config for log rotation
 
 Cron expression format (minute hour day month weekday):

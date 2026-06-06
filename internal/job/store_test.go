@@ -92,6 +92,58 @@ func TestList_IncludesExternalPlists(t *testing.T) {
 	}
 }
 
+func TestListManaged_IgnoresExternalPlistsAndWarnings(t *testing.T) {
+	j := job.NewJob("0 12 * * *", []string{"/usr/bin/foo"})
+	dir := setupTestDir(t, j)
+	if err := os.WriteFile(filepath.Join(dir, "bad.plist"), []byte("not xml"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	externalPlist := `<?xml version="1.0" encoding="UTF-8"?>
+<plist version="1.0"><dict>
+	<key>Label</key><string>com.apple.foo</string>
+	<key>ProgramArguments</key><array><string>/usr/bin/foo</string></array>
+</dict></plist>`
+	if err := os.WriteFile(filepath.Join(dir, "com.apple.foo.plist"), []byte(externalPlist), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	jobs, warnings, err := job.ListManaged(dir)
+	if err != nil {
+		t.Fatalf("ListManaged: %v", err)
+	}
+	if len(jobs) != 1 {
+		t.Fatalf("expected 1 managed job, got %d", len(jobs))
+	}
+	if jobs[0].ID != j.ID {
+		t.Errorf("ID: got %q, want %q", jobs[0].ID, j.ID)
+	}
+	if len(warnings) != 0 {
+		t.Fatalf("expected no warnings for external plist files, got %+v", warnings)
+	}
+}
+
+func TestListManaged_WarnsForMalformedLdcronPlist(t *testing.T) {
+	dir := t.TempDir()
+	badPath := filepath.Join(dir, "com.ldcron.bad.plist")
+	if err := os.WriteFile(badPath, []byte("not xml"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	jobs, warnings, err := job.ListManaged(dir)
+	if err != nil {
+		t.Fatalf("ListManaged: %v", err)
+	}
+	if len(jobs) != 0 {
+		t.Fatalf("expected no jobs, got %d", len(jobs))
+	}
+	if len(warnings) != 1 {
+		t.Fatalf("expected 1 warning, got %d", len(warnings))
+	}
+	if warnings[0].Path != badPath {
+		t.Errorf("warning path: got %q, want %q", warnings[0].Path, badPath)
+	}
+}
+
 func TestList_ManagedFlagSetForLdcronJobs(t *testing.T) {
 	j := job.NewJob("0 12 * * *", []string{"/usr/bin/foo"})
 	dir := setupTestDir(t, j)

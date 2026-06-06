@@ -38,11 +38,15 @@ brew tap s4na/ldcron https://github.com/s4na/ldcron
 brew install ldcron
 ```
 
+Homebrewでインストール・アップグレードした場合、既存の旧形式ldcron plistはインストール後に自動で現在のID形式へ移行されます。移行に失敗した場合は警告が表示され、`ldcron migrate`で再実行できます。
+
 ### go install
 
 ```bash
 go install github.com/s4na/ldcron@latest
 ```
+
+`go install`でv0.1.2以前からアップグレードした場合は、インストール後に`ldcron migrate`を実行してください。
 
 **動作要件:** macOS 12 (Monterey) 以降
 
@@ -127,6 +131,29 @@ ID                        SCHEDULE        COMMAND
 a1b2c3d4e5f6a7b8          0 12 * * *      /usr/local/bin/backup.sh
 e5f6a7b8a1b2c3d4          */5 * * * *     /usr/bin/ruby /path/to/worker.rb
 com.apple.ccachefixer     -               /usr/libexec/ccachefixer
+```
+
+---
+
+### `migrate` — 旧形式のldcronジョブを移行する
+
+```
+ldcron migrate [--dry-run]
+```
+
+v0.1.2以前に作成された8文字IDのldcron管理plistを、現在の16文字ID形式へ移行します。ロード中のジョブは旧launchdラベルから新launchdラベルへ載せ替え、ロードされていないplistはファイルだけを書き換えます。
+
+```bash
+# 変更内容を確認
+ldcron migrate --dry-run
+
+# 移行を実行
+ldcron migrate
+```
+
+```
+Migrated legacy ldcron jobs:
+  a1b2c3d4 -> a1b2c3d4e5f6a7b8 (migrated)
 ```
 
 ---
@@ -274,7 +301,7 @@ ldcron log setup-rotation | sudo tee /etc/newsyslog.d/com.ldcron.conf
 ## トラブルシューティング
 
 **v0.1.2以前からのアップグレード**
-v0.1.3でジョブIDが8文字から16文字に変更されました。既存の8文字IDのジョブはそのまま動作し、`ldcron list`・`ldcron run <古いID>`・`ldcron remove <古いID>`で引き続き管理できます。同じスケジュール＋コマンドを再登録しようとした場合も既存ジョブとして検出されるため、移行作業は不要です。16文字IDに揃えたい場合だけ、`ldcron remove <古いID>`で削除してから同じ内容を再登録してください。
+v0.1.3でジョブIDが8文字から16文字に変更されました。Homebrewでインストール・アップグレードした場合は、インストール後に既存の8文字ID plistを現在の16文字ID形式へ自動移行します。`go install`を使った場合、またはHomebrewの移行警告が表示された場合は、`ldcron migrate`を実行してください。事前に変更内容を確認したい場合は`ldcron migrate --dry-run`を使えます。
 
 **`already registered`（すでに登録済みです）**
 同一のスケジュール＋コマンドがすでに登録されています。`ldcron list`で既存ジョブを確認し、必要であれば`ldcron remove`で削除してから再登録してください。

@@ -44,6 +44,11 @@ func (c *Client) Bootout(label string) error {
 	return nil
 }
 
+// IsLoaded reports whether launchd currently knows about label in the domain.
+func (c *Client) IsLoaded(label string) bool {
+	return c.run("launchctl", "print", c.Domain+"/"+label) == nil
+}
+
 // Kickstart triggers an immediate run of the service (non-blocking).
 // If force is true, any currently running instance is killed first (-k flag).
 func (c *Client) Kickstart(label string, force bool) error {

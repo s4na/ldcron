@@ -23,6 +23,18 @@ type ParseWarning struct {
 // ParseWarnings contains entries for plist files that could not be parsed.
 func List(launchAgentsDir string) ([]*Job, []ParseWarning, error) {
 	pattern := filepath.Join(launchAgentsDir, "*.plist")
+	return listMatching(pattern)
+}
+
+// ListManaged returns launchd jobs found in ldcron-named plist files.
+// ParseWarnings contains entries for ldcron-named plist files that could not be
+// parsed.
+func ListManaged(launchAgentsDir string) ([]*Job, []ParseWarning, error) {
+	pattern := filepath.Join(launchAgentsDir, "com.ldcron.*.plist")
+	return listMatching(pattern)
+}
+
+func listMatching(pattern string) ([]*Job, []ParseWarning, error) {
 	matches, err := filepath.Glob(pattern)
 	if err != nil {
 		return nil, nil, err

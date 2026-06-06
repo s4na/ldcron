@@ -46,6 +46,31 @@ func TestBootout_CommandArgs(t *testing.T) {
 	}
 }
 
+func TestIsLoaded_CommandArgs(t *testing.T) {
+	var gotArgs []string
+	c := newTestClient("gui/501", func(_ string, args ...string) error {
+		gotArgs = args
+		return nil
+	})
+
+	if !c.IsLoaded("com.ldcron.abc12345") {
+		t.Fatal("expected loaded service")
+	}
+	if len(gotArgs) != 2 || gotArgs[0] != "print" || gotArgs[1] != "gui/501/com.ldcron.abc12345" {
+		t.Errorf("args: got %v", gotArgs)
+	}
+}
+
+func TestIsLoaded_ReturnsFalseOnError(t *testing.T) {
+	c := newTestClient("gui/501", func(_ string, _ ...string) error {
+		return errors.New("service not found")
+	})
+
+	if c.IsLoaded("com.ldcron.missing") {
+		t.Fatal("expected missing service to be reported as unloaded")
+	}
+}
+
 func TestKickstart_CommandArgs(t *testing.T) {
 	var gotArgs []string
 	c := newTestClient("gui/501", func(_ string, args ...string) error {
