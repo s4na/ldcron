@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -55,9 +56,24 @@ func Find(launchAgentsDir, id string) (*Job, error) {
 	return nil, nil
 }
 
-// FindDuplicate looks for a job with the same ID as the given job.
+// FindDuplicate looks for an already registered ldcron job equivalent to the
+// given job. It first checks the current deterministic ID, then falls back to
+// schedule+args so jobs created by older ldcron releases with shorter IDs are
+// still treated as duplicates instead of being re-registered.
 func FindDuplicate(launchAgentsDir string, j *Job) (*Job, error) {
-	return Find(launchAgentsDir, j.ID)
+	jobs, _, err := List(launchAgentsDir)
+	if err != nil {
+		return nil, err
+	}
+	for _, existing := range jobs {
+		if existing.ID == j.ID {
+			return existing, nil
+		}
+		if existing.Managed && j.Managed && existing.Schedule == j.Schedule && slices.Equal(existing.Args, j.Args) {
+			return existing, nil
+		}
+	}
+	return nil, nil
 }
 
 // PlistPath returns the discovered plist path when available, otherwise the label-derived path.

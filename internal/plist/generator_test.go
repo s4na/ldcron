@@ -1,8 +1,10 @@
 package plist_test
 
 import (
+	"bytes"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -183,6 +185,163 @@ func TestReadPlistInfo_ProgramKeyFallback(t *testing.T) {
 	}
 	if len(args) != 1 || args[0] != "/usr/sbin/daemon" {
 		t.Errorf("args: got %v, want [/usr/sbin/daemon]", args)
+	}
+}
+
+func TestReadPlistInfo_ProgramAndProgramArguments(t *testing.T) {
+	// When Program is set, launchd uses it as the executable path and treats
+	// ProgramArguments as argv. The first ProgramArguments element is argv[0],
+	// so the displayed command should use Program plus the remaining arguments.
+	programPlist := `<?xml version="1.0" encoding="UTF-8"?>
+<plist version="1.0"><dict>
+	<key>Label</key><string>com.example.python</string>
+	<key>Program</key><string>/usr/bin/python3</string>
+	<key>ProgramArguments</key><array><string>python3</string><string>-c</string><string>print('ok')</string></array>
+</dict></plist>`
+
+	tmp := t.TempDir()
+	path := filepath.Join(tmp, "com.example.python.plist")
+	if err := os.WriteFile(path, []byte(programPlist), 0o644); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+
+	label, _, args, err := plist.ReadPlistInfo(path)
+	if err != nil {
+		t.Fatalf("ReadPlistInfo: %v", err)
+	}
+	if label != "com.example.python" {
+		t.Errorf("label: got %q, want %q", label, "com.example.python")
+	}
+	wantArgs := []string{"/usr/bin/python3", "-c", "print('ok')"}
+	if strings.Join(args, "\x00") != strings.Join(wantArgs, "\x00") {
+		t.Errorf("args: got %q, want %q", args, wantArgs)
+	}
+}
+
+func TestReadPlistInfo_BundleProgramFallback(t *testing.T) {
+	bundleProgramPlist := `<?xml version="1.0" encoding="UTF-8"?>
+<plist version="1.0"><dict>
+	<key>Label</key><string>com.example.bundle</string>
+	<key>BundleProgram</key><string>Contents/MacOS/example</string>
+</dict></plist>`
+
+	tmp := t.TempDir()
+	path := filepath.Join(tmp, "com.example.bundle.plist")
+	if err := os.WriteFile(path, []byte(bundleProgramPlist), 0o644); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+
+	_, _, args, err := plist.ReadPlistInfo(path)
+	if err != nil {
+		t.Fatalf("ReadPlistInfo: %v", err)
+	}
+	if len(args) != 1 || args[0] != "Contents/MacOS/example" {
+		t.Errorf("args: got %v, want [Contents/MacOS/example]", args)
+	}
+}
+
+func TestReadPlistInfo_OnlyReadsTopLevelKeys(t *testing.T) {
+	nestedPlist := `<?xml version="1.0" encoding="UTF-8"?>
+<plist version="1.0"><dict>
+	<key>Label</key><string>com.example.correct</string>
+	<key>ProgramArguments</key><array><string>/usr/bin/true</string></array>
+	<key>EnvironmentVariables</key>
+	<dict>
+		<key>Label</key><string>com.example.wrong</string>
+		<key>Program</key><string>/tmp/wrong</string>
+		<key>X-Ldcron-Schedule</key><string>* * * * *</string>
+		<key>ProgramArguments</key><array><string>/tmp/wrong</string></array>
+	</dict>
+</dict></plist>`
+
+	tmp := t.TempDir()
+	path := filepath.Join(tmp, "nested.plist")
+	if err := os.WriteFile(path, []byte(nestedPlist), 0o644); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+
+	label, schedule, args, err := plist.ReadPlistInfo(path)
+	if err != nil {
+		t.Fatalf("ReadPlistInfo: %v", err)
+	}
+	if label != "com.example.correct" {
+		t.Errorf("label: got %q, want com.example.correct", label)
+	}
+	if schedule != "" {
+		t.Errorf("schedule: got %q, want empty", schedule)
+	}
+	if len(args) != 1 || args[0] != "/usr/bin/true" {
+		t.Errorf("args: got %v, want [/usr/bin/true]", args)
+	}
+}
+
+func TestReadPlistInfo_IgnoresBooleanLaunchdKeys(t *testing.T) {
+	boolPlist := `<?xml version="1.0" encoding="UTF-8"?>
+<plist version="1.0"><dict>
+	<key>Label</key><string>com.example.bool</string>
+	<key>ProgramArguments</key><array><string>/usr/bin/true</string></array>
+	<key>RunAtLoad</key><true/>
+	<key>KeepAlive</key><false/>
+</dict></plist>`
+
+	tmp := t.TempDir()
+	path := filepath.Join(tmp, "com.example.bool.plist")
+	if err := os.WriteFile(path, []byte(boolPlist), 0o644); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+
+	label, _, args, err := plist.ReadPlistInfo(path)
+	if err != nil {
+		t.Fatalf("ReadPlistInfo: %v", err)
+	}
+	if label != "com.example.bool" {
+		t.Errorf("label: got %q, want com.example.bool", label)
+	}
+	if len(args) != 1 || args[0] != "/usr/bin/true" {
+		t.Errorf("args: got %v, want [/usr/bin/true]", args)
+	}
+}
+
+func TestReadPlistInfo_BinaryPlist(t *testing.T) {
+	const plutilPath = "/usr/bin/plutil"
+	if _, err := os.Stat(plutilPath); err != nil {
+		t.Skip("/usr/bin/plutil is required to create a binary plist fixture")
+	}
+
+	j := job.NewJob("0 9 * * 1-5", []string{"/usr/bin/true"})
+	data, err := plist.Generate(j.Label, j.Schedule, j.Args, "/tmp/logs")
+	if err != nil {
+		t.Fatalf("Generate: %v", err)
+	}
+
+	tmp := t.TempDir()
+	path := filepath.Join(tmp, j.Label+".plist")
+	if writeErr := os.WriteFile(path, data, 0o644); writeErr != nil {
+		t.Fatalf("WriteFile: %v", writeErr)
+	}
+	if out, convertErr := exec.Command(plutilPath, "-convert", "binary1", path).CombinedOutput(); convertErr != nil {
+		t.Fatalf("plutil -convert binary1: %v\n%s", convertErr, out)
+	}
+	binaryData, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("ReadFile: %v", err)
+	}
+	if !bytes.HasPrefix(binaryData, []byte("bplist00")) {
+		t.Fatalf("test fixture was not converted to a binary plist")
+	}
+
+	label, schedule, args, err := plist.ReadPlistInfo(path)
+	if err != nil {
+		t.Fatalf("ReadPlistInfo: %v", err)
+	}
+	if label != j.Label {
+		t.Errorf("label: got %q, want %q", label, j.Label)
+	}
+	if schedule != j.Schedule {
+		t.Errorf("schedule: got %q, want %q", schedule, j.Schedule)
+	}
+	if len(args) != 1 || args[0] != "/usr/bin/true" {
+		t.Errorf("args: got %v, want [/usr/bin/true]", args)
 	}
 }
 
@@ -614,4 +773,3 @@ func TestGenerate_SingleLineScript(t *testing.T) {
 		})
 	}
 }
-

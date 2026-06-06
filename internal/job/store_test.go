@@ -198,6 +198,63 @@ func TestFindDuplicate_DetectsDuplicate(t *testing.T) {
 	}
 }
 
+func TestFindDuplicate_DetectsLegacyManagedJobWithSameScheduleAndArgs(t *testing.T) {
+	dir := t.TempDir()
+	schedule := "0 12 * * *"
+	args := []string{"/usr/bin/foo"}
+
+	legacyLabel := "com.ldcron.deadbeef"
+	data, err := plist.Generate(legacyLabel, schedule, args, filepath.Join(dir, "logs"))
+	if err != nil {
+		t.Fatalf("Generate: %v", err)
+	}
+	if writeErr := os.WriteFile(filepath.Join(dir, legacyLabel+".plist"), data, 0o644); writeErr != nil {
+		t.Fatalf("WriteFile: %v", writeErr)
+	}
+
+	current := job.NewJob(schedule, args)
+	if current.ID == "deadbeef" {
+		t.Fatalf("test setup unexpectedly produced legacy ID %q", current.ID)
+	}
+
+	dup, err := job.FindDuplicate(dir, current)
+	if err != nil {
+		t.Fatalf("FindDuplicate: %v", err)
+	}
+	if dup == nil {
+		t.Fatal("expected duplicate, got nil")
+	}
+	if dup.ID != "deadbeef" {
+		t.Errorf("duplicate ID: got %q, want deadbeef", dup.ID)
+	}
+	if !dup.Managed {
+		t.Error("legacy ldcron plist should still be treated as managed")
+	}
+}
+
+func TestFindDuplicate_DoesNotMatchLegacyManagedJobWithDifferentArgs(t *testing.T) {
+	dir := t.TempDir()
+	schedule := "0 12 * * *"
+
+	legacyLabel := "com.ldcron.deadbeef"
+	data, err := plist.Generate(legacyLabel, schedule, []string{"/usr/bin/foo"}, filepath.Join(dir, "logs"))
+	if err != nil {
+		t.Fatalf("Generate: %v", err)
+	}
+	if writeErr := os.WriteFile(filepath.Join(dir, legacyLabel+".plist"), data, 0o644); writeErr != nil {
+		t.Fatalf("WriteFile: %v", writeErr)
+	}
+
+	current := job.NewJob(schedule, []string{"/usr/bin/bar"})
+	dup, err := job.FindDuplicate(dir, current)
+	if err != nil {
+		t.Fatalf("FindDuplicate: %v", err)
+	}
+	if dup != nil {
+		t.Fatalf("expected no duplicate for different args, got %+v", dup)
+	}
+}
+
 func TestFindDuplicate_NoDuplicateForDifferentJob(t *testing.T) {
 	j := job.NewJob("0 12 * * *", []string{"/usr/bin/foo"})
 	dir := setupTestDir(t, j)
