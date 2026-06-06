@@ -21,8 +21,8 @@ With --force, the plist is deleted even if launchctl bootout fails.
 Use this to recover when launchd and the plist are out of sync.
 
 Examples:
-  ldcron remove abc12345
-  ldcron remove abc12345 --force`,
+  ldcron remove a1b2c3d4e5f6a7b8
+  ldcron remove a1b2c3d4e5f6a7b8 --force`,
 	Args:         cobra.ExactArgs(1),
 	SilenceUsage: true,
 	RunE:         runRemove,

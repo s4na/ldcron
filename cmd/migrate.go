@@ -50,7 +50,7 @@ func runMigrate(_ *cobra.Command, _ []string) error {
 
 	results, warnings, err := migrate.Run(agentsDir, logD, lc, migrate.Options{DryRun: migrateDryRun})
 	for _, warn := range warnings {
-		fmt.Fprintf(os.Stderr, "warning: skipped unreadable plist %s: %v\n", warn.Path, warn.Err)
+		fmt.Fprintf(os.Stderr, "warning: skipped plist that could not be parsed %s: %v\n", warn.Path, warn.Err)
 	}
 	if err != nil {
 		return err
