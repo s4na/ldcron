@@ -106,11 +106,11 @@ ldcron add "0 * * * *" $'cd /tmp\nfind . -name "*.log" -mtime +30 -delete\necho 
 ```
 
 ```
-ジョブを追加しました
+Job added
   ID:       a1b2c3d4e5f6a7b8
-  スケジュール: 0 12 * * *
-  コマンド:   /usr/local/bin/backup.sh
-  ログ:      ~/Library/Logs/ldcron/a1b2c3d4e5f6a7b8.log
+  Schedule: 0 12 * * *
+  Command:  /usr/local/bin/backup.sh
+  Log:      ~/Library/Logs/ldcron/a1b2c3d4e5f6a7b8.log
 ```
 
 > **補足:** 同一のスケジュール＋コマンドの重複登録は防止されます。同じ入力からは常に同じIDが生成されます。
@@ -172,10 +172,10 @@ ldcron remove com.apple.ccachefixer
 ```
 
 ```
-ジョブを削除しました
+Job removed
   ID:       a1b2c3d4e5f6a7b8
-  スケジュール: 0 12 * * *
-  コマンド:   /usr/local/bin/backup.sh
+  Schedule: 0 12 * * *
+  Command:  /usr/local/bin/backup.sh
 ```
 
 ---
@@ -200,10 +200,13 @@ ldcron run --force a1b2c3d4e5f6a7b8
 ```
 
 ```
-ジョブをバックグラウンドで起動しました
+Job started in background
   ID:      a1b2c3d4e5f6a7b8
-  コマンド: /usr/local/bin/backup.sh
-  ログ:    ~/Library/Logs/ldcron/a1b2c3d4e5f6a7b8.log
+  Command: /usr/local/bin/backup.sh
+  Log:     ~/Library/Logs/ldcron/a1b2c3d4e5f6a7b8.log
+
+Follow log output:
+  tail -f ~/Library/Logs/ldcron/a1b2c3d4e5f6a7b8.log
 ```
 
 > **補足:** `--force`なしでは、すでに実行中のジョブはエラーを返します。`--force`は実行中のインスタンスを強制終了してから再起動します。実行中のジョブを中断してよい場合のみ使用してください。
