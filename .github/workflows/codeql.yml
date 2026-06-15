@@ -19,7 +19,7 @@ jobs:
       contents: read
 
     steps:
-      - uses: actions/checkout@v6.0.2
+      - uses: actions/checkout@v6.0.3
 
       - name: Set up Go
         uses: actions/setup-go@v6
